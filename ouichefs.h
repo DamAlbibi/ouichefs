@@ -72,8 +72,12 @@ struct ouichefs_sb_info {
 	uint32_t nr_free_inodes;  /* Number of free inodes */
 	uint32_t nr_free_blocks;  /* Number of free blocks */
 
+	uuid_t uuid;
+	
 	unsigned long *ifree_bitmap; /* In-memory free inodes bitmap */
 	unsigned long *bfree_bitmap; /* In-memory free blocks bitmap */
+
+	
 };
 
 struct ouichefs_file_index_block {
@@ -99,6 +103,8 @@ struct inode *ouichefs_iget(struct super_block *sb, unsigned long ino);
 extern const struct file_operations ouichefs_file_ops;
 extern const struct file_operations ouichefs_dir_ops;
 extern const struct address_space_operations ouichefs_aops;
+
+
 
 /* Getters for superbock and inode */
 #define OUICHEFS_SB(sb) (sb->s_fs_info)

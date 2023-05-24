@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <endian.h>
 #include <string.h>
+#include <uuid/uuid.h>
 
 #define OUICHEFS_MAGIC  0x48434957
 
@@ -47,7 +48,9 @@ struct ouichefs_superblock {
 	uint32_t nr_free_inodes;  /* Number of free inodes */
 	uint32_t nr_free_blocks;  /* Number of free blocks */
 
-	char padding[4064];       /* Padding to match block size */
+	uuid_t uuid; /* uuid */
+
+	char padding[4064 - 16];       /* Padding to match block size */
 };
 
 struct ouichefs_file_index_block {
@@ -99,7 +102,6 @@ static struct ouichefs_superblock *write_superblock(int fd, struct stat *fstats)
 	nr_ifree_blocks = idiv_ceil(nr_inodes, OUICHEFS_BLOCK_SIZE * 8);
 	nr_bfree_blocks = idiv_ceil(nr_blocks, OUICHEFS_BLOCK_SIZE * 8);
 	nr_data_blocks = nr_blocks - 1 - nr_istore_blocks - nr_ifree_blocks - nr_bfree_blocks;
-
 	memset(sb, 0, sizeof(struct ouichefs_superblock));
 	sb->magic = htole32(OUICHEFS_MAGIC);
 	sb->nr_blocks = htole32(nr_blocks);
@@ -109,6 +111,9 @@ static struct ouichefs_superblock *write_superblock(int fd, struct stat *fstats)
 	sb->nr_bfree_blocks = htole32(nr_bfree_blocks);
 	sb->nr_free_inodes = htole32(nr_inodes - 1);
 	sb->nr_free_blocks = htole32(nr_data_blocks - 1);
+
+	/* uuid */
+	uuid_generate(sb->uuid);
 
 	ret = write(fd, sb, sizeof(struct ouichefs_superblock));
 	if (ret != sizeof(struct ouichefs_superblock)) {

@@ -11,6 +11,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 #include "ouichefs.h"
 #include "bitmap.h"
@@ -299,6 +300,64 @@ end:
 }
 
 /*
+ * Fonction d'ajout du nouveau fichier créer par un link
+ */
+
+int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	struct dentry *father = new_dentry->d_parent;
+	struct inode* father_inode = d_inode(father);
+	struct ouichefs_inode_info *ci = OUICHEFS_INODE(father_inode);
+	struct buffer_head *bh_old = NULL, *bh_new = NULL;
+	struct ouichefs_dir_block *dir_block = NULL;
+	int i;
+
+	// Vérification de la taille du nom
+	if (strlen(new_dentry->d_name.name) > OUICHEFS_FILENAME_LEN)
+		return -ENAMETOOLONG;
+	
+	bh_new = sb_bread(sb, ci->index_block);
+	if (!bh_new)
+		return -EIO;
+	dir_block = (struct ouichefs_dir_block *)bh_new->b_data;
+	// Recherche du premier free-slot
+	for (i = 0; i < OUICHEFS_MAX_SUBFILES; i++){
+		if (dir_block->files[i].inode == 0)
+			break;
+	}
+	dir_block->files[i].inode = inode->i_ino;
+	strncpy(dir_block->files[i].filename,
+		new_dentry->d_name.name, OUICHEFS_FILENAME_LEN);
+	mark_buffer_dirty(bh_new);
+	brelse(bh_new);
+
+	return 0;
+
+}
+
+/*
+ * Fonction de lien pour ouichfs
+ */
+
+static int ouichefs_link(struct dentry *old_dentry, struct inode *dir, 
+		struct dentry * dentry)
+{
+
+	struct inode *inode = d_inode(old_dentry);
+	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); // Update des temps de l'inode 
+	inode_inc_link_count(inode); // Incrémenter le cpt de lien 
+	ihold(inode);
+	if (ouichefs_add_link(dentry,inode)==0){
+		dget(dentry);
+		d_instantiate(dentry,inode);
+	}
+		
+
+	return 0;
+}
+
+/*
  * Remove a link for a file. If link count is 0, destroy file in this way:
  *   - remove the file from its parent directory.
  *   - cleanup blocks containing data
@@ -327,7 +386,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 
 	/* Search for inode in parent index and get number of subfiles */
 	for (i = 0; i < OUICHEFS_MAX_SUBFILES; i++) {
-		if (dir_block->files[i].inode == ino)
+		if (dir_block->files[i].inode == ino && strcmp(dir_block->files[i].filename,dentry->d_name.name)==0)
 			f_id = i;
 		else if (dir_block->files[i].inode == 0)
 			break;
@@ -347,15 +406,27 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	/* Update inode stats */
 	dir->i_mtime = dir->i_atime = dir->i_ctime = current_time(dir);
 	if (S_ISDIR(inode->i_mode))
+	{
 		inode_dec_link_count(dir);
+	}
+	else
+	{
+		inode_dec_link_count(inode);
+	} 
+
 	mark_inode_dirty(dir);
 
+	if (inode->i_nlink!=0)
+		return 0;
+	
+	
 	/*
 	 * Cleanup pointed blocks if unlinking a file. If we fail to read the
 	 * index block, cleanup inode anyway and lose this file's blocks
 	 * forever. If we fail to scrub a data block, don't fail (too late
 	 * anyway), just put the block and continue.
 	 */
+	
 	bh = sb_bread(sb, bno);
 	if (!bh)
 		goto clean_inode;
@@ -549,6 +620,7 @@ static int ouichefs_rmdir(struct inode *dir, struct dentry *dentry)
 static const struct inode_operations ouichefs_inode_ops = {
 	.lookup = ouichefs_lookup,
 	.create = ouichefs_create,
+	.link = ouichefs_link,
 	.unlink = ouichefs_unlink,
 	.mkdir  = ouichefs_mkdir,
 	.rmdir  = ouichefs_rmdir,

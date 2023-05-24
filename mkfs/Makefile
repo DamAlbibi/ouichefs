@@ -5,7 +5,7 @@ IMGSIZE ?= 50
 all: ${BIN}
 
 ${BIN}: mkfs-ouichefs.c
-	gcc -Wall -o $@ $<
+	gcc -Wall -o $@ $< -luuid
 
 img: ${BIN}
 	rm -rf ${IMG}

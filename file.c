@@ -183,6 +183,10 @@ end:
 	return ret;
 }
 
+// définiton de l'ioctl 
+
+
+
 const struct address_space_operations ouichefs_aops = {
 	.readpage    = ouichefs_readpage,
 	.writepage   = ouichefs_writepage,
@@ -194,5 +198,5 @@ const struct file_operations ouichefs_file_ops = {
 	.owner      = THIS_MODULE,
 	.llseek     = generic_file_llseek,
 	.read_iter  = generic_file_read_iter,
-	.write_iter = generic_file_write_iter
+	.write_iter = generic_file_write_iter,
 };
