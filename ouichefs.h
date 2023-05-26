@@ -18,6 +18,9 @@
 #define OUICHEFS_FILENAME_LEN            28
 #define OUICHEFS_MAX_SUBFILES           128
 
+#define DT_DISTANT 16
+#define IS_DISTANT(sb) (sb->i_mode & (1 << 15))
+
 
 /*
  * ouiche_fs partition layout
@@ -89,6 +92,12 @@ struct ouichefs_dir_block {
 		uint32_t inode;
 		char filename[OUICHEFS_FILENAME_LEN];
 	} files[OUICHEFS_MAX_SUBFILES];
+};
+
+// Structure pour écrire sur les liens distant 
+struct ouichefs_distant_link {
+	uuid_t uuid;
+	unsigned long inode;
 };
 
 /* superblock functions */
