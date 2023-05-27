@@ -18,7 +18,6 @@
 #include "bitmap.h"
 
 static const struct inode_operations ouichefs_inode_ops;
-
 /*
  * Get inode ino from disk.
  */
@@ -322,6 +321,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 	struct super_block *old, *new;
 	struct buffer_head *bh;
 	struct ouichefs_distant_link dist_link;
+	char *fblock;
 
 	old = old_dentry->d_sb;
 	new = new_dentry->d_sb;
@@ -345,16 +345,17 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		new_inode = new_dentry->d_inode;
 		if (new_inode == NULL)
 			return 0; //check ERRCODE
-
-		new_inode->i_mode |= (1 << 15); //first bit = mark for distant link
+		new_inode->i_mode &= ~ (S_IFREG); // On enlève le regular_file
+		new_inode->i_mode |= (DT_DISTANT<<12); //first bit = mark for distant link
+	
 		bh = sb_bread(new, OUICHEFS_INODE(new_inode)->index_block);
 		if(!bh)
 			return -EIO;
-
+		pr_info("num recopié %d\n",new_inode->i_ino);
 		uuid_copy(&dist_link.uuid, &old->s_uuid);
 		dist_link.inode = inode->i_ino;
-
-		memcpy(bh->b_data, (void *)&dist_link, sizeof(dist_link));
+		fblock = (char *)bh->b_data;
+		memcpy(fblock, (void *)&dist_link, sizeof(dist_link));
 		mark_buffer_dirty(bh);
 		brelse(bh);
 		mark_inode_dirty(new_inode);
@@ -380,6 +381,7 @@ int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 	struct buffer_head *bh_old = NULL, *bh_new = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	int i;
+	pr_info("Le nombre de partition %d\n",part_total);
 
 	// Vérification de la taille du nom
 	if (strlen(new_dentry->d_name.name) > OUICHEFS_FILENAME_LEN)

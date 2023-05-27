@@ -24,16 +24,9 @@
 #include "ioctl_interface.h"
 
 #define DEVICE_NAME "ouichefs"
-#define MAXMOUNT 100
 
-int part_total=0;
 
-struct dentry_kobj
-{
-	struct dentry* kobj_dentry;
-	struct kobj_attribute kobj_att;
-};
-
+int part_total = 0;
 struct dentry_kobj tab_d_kobj[MAXMOUNT];
 char uid_parse[8];
 
