@@ -128,7 +128,7 @@ static int sync_ifree(struct super_block *sb, int wait)
 	int i, idx;
 
 	/* Flush free inodes bitmask */
-	for (i = 0; i < sbi->nr_ifree_blocks; i++) {
+	for (i = 0; i < sbi->nr_ifree_blocks; ++i) {
 		idx = sbi->nr_istore_blocks + i + 1;
 
 		bh = sb_bread(sb, idx);
@@ -155,7 +155,7 @@ static int sync_bfree(struct super_block *sb, int wait)
 	int i, idx;
 
 	/* Flush free blocks bitmask */
-	for (i = 0; i < sbi->nr_bfree_blocks; i++) {
+	for (i = 0; i < sbi->nr_bfree_blocks; ++i) {
 		idx = sbi->nr_istore_blocks + sbi->nr_ifree_blocks + i + 1;
 
 		bh = sb_bread(sb, idx);
@@ -237,7 +237,6 @@ int ouichefs_fill_super(struct super_block *sb, void *data, int silent)
 	struct ouichefs_sb_info *sbi = NULL;
 	struct inode *root_inode = NULL;
 	int ret = 0, i;
-	__u8 tab[UUID_SIZE]; //TO REMOVE
 
 	/* Init sb */
 	sb->s_magic = OUICHEFS_MAGIC;
@@ -276,13 +275,6 @@ int ouichefs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_fs_info = sbi;
 	uuid_copy(&sb->s_uuid, &csb->uuid);
 
-	/* TEST AFFICHAGE*/
-	export_uuid(tab, &sb->s_uuid);
-	for(i = 0; i < 16; ++i) {
-		pr_warn("%d", tab[i]);
-	}
-	/* END */
-
 	brelse(bh);
 
 	/* Alloc and copy ifree_bitmap */
@@ -292,7 +284,7 @@ int ouichefs_fill_super(struct super_block *sb, void *data, int silent)
 		ret = -ENOMEM;
 		goto free_sbi;
 	}
-	for (i = 0; i < sbi->nr_ifree_blocks; i++) {
+	for (i = 0; i < sbi->nr_ifree_blocks; ++i) {
 		int idx = sbi->nr_istore_blocks + i + 1;
 
 		bh = sb_bread(sb, idx);
@@ -314,7 +306,7 @@ int ouichefs_fill_super(struct super_block *sb, void *data, int silent)
 		ret = -ENOMEM;
 		goto free_ifree;
 	}
-	for (i = 0; i < sbi->nr_bfree_blocks; i++) {
+	for (i = 0; i < sbi->nr_bfree_blocks; ++i) {
 		int idx = sbi->nr_istore_blocks + sbi->nr_ifree_blocks + i + 1;
 
 		bh = sb_bread(sb, idx);
