@@ -1,5 +1,7 @@
 #!/bin/bash
 
+FILE_IMG1=test.img
+FILE_IMG2=test2.img
 DIR_PART1=part1
 DIR_PART2=part2
 
@@ -14,4 +16,12 @@ fi
 
 if test -d "$DIR_PART2"; then
         rm -r "$DIR_PART2"
+fi
+
+if test -f "$FILE_IMG1"; then
+        rm $FILE_IMG1
+fi
+
+if test -f "$FILE_IMG2"; then
+        rm $FILE_IMG2
 fi

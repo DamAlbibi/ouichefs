@@ -20,7 +20,7 @@ cd $DIR_PART
 touch $FILE_FIC
 ln -s $FILE_FIC $DISTANT_LINK
 
-echo "POUFFF" >> $FILE_FIC
+echo "TEST" >> $FILE_FIC
 
 echo -n "Contenu fichier fic : "
 cat "${DIR_PART}/$FILE_FIC"

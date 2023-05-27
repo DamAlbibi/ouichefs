@@ -24,7 +24,7 @@ if test -f "$HARD_LINK"; then
         rm $HARD_LINK
 fi
 ln $FILE_FIC $HARD_LINK
-echo "POUF" >> $FILE_FIC
+echo "TEST" >> $FILE_FIC
 echo -n "Contenu fichier fic : "
 cat $FILE_FIC 
 echo -n "Contenu fichier lien : "
