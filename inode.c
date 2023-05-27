@@ -12,12 +12,12 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/namei.h>
 
 #include "ouichefs.h"
 #include "bitmap.h"
 
 static const struct inode_operations ouichefs_inode_ops;
-
 /*
  * Get inode ino from disk.
  */
@@ -299,6 +299,75 @@ end:
 	return ret;
 }
 
+
+// Fonction de lien symbolique utilisée pour les liens distant 
+
+static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const char *pathname) {
+
+	// Récuperation de la dentry 
+	int error = 0;
+	struct path path;
+	error = kern_path(pathname, LOOKUP_FOLLOW, &path);
+	if (error)
+		return ERR_PTR(error);
+	
+	
+	struct inode *new_inode; // Inode du nouveau
+	
+
+	struct dentry* old_dentry = path.dentry;	
+	struct inode *inode = d_inode(old_dentry);
+
+	struct super_block *old, *new;
+	struct buffer_head *bh;
+	struct ouichefs_distant_link dist_link;
+	char *fblock;
+
+	old = old_dentry->d_sb;
+	new = new_dentry->d_sb;
+
+	if (strncmp("ouichefs", old->s_type->name, 8) != 0 || strncmp("ouichefs", new->s_type->name, 8) != 0)
+		return -EINVAL;
+
+	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); // Update des temps de l'inode 
+	inode_inc_link_count(inode); // Incrémenter le cpt de lien 
+	ihold(inode);
+
+	if (uuid_equal(&old->s_uuid, &new->s_uuid)) {
+		pr_debug("Lien symbolique non-implementé");
+		return -EINVAL;
+	}
+	else {
+		ouichefs_create(dir, new_dentry, inode->i_mode, 0);
+
+		//distant link
+
+		new_inode = new_dentry->d_inode;
+		if (new_inode == NULL)
+			return 0; //check ERRCODE
+		new_inode->i_mode &= ~ (S_IFREG); // On enlève le regular_file
+		new_inode->i_mode |= (DT_DISTANT<<12); //first bit = mark for distant link
+	
+		bh = sb_bread(new, OUICHEFS_INODE(new_inode)->index_block);
+		if(!bh)
+			return -EIO;
+		pr_info("num recopié %d\n",new_inode->i_ino);
+		uuid_copy(&dist_link.uuid, &old->s_uuid);
+		dist_link.inode = inode->i_ino;
+		fblock = (char *)bh->b_data;
+		memcpy(fblock, (void *)&dist_link, sizeof(dist_link));
+		mark_buffer_dirty(bh);
+		brelse(bh);
+		mark_inode_dirty(new_inode);
+	}
+
+	return 0;
+}
+	
+
+
+
+
 /*
  * Fonction d'ajout du nouveau fichier créer par un link
  */
@@ -312,6 +381,7 @@ int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 	struct buffer_head *bh_old = NULL, *bh_new = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	int i;
+	pr_info("Le nombre de partition %d\n",part_total);
 
 	// Vérification de la taille du nom
 	if (strlen(new_dentry->d_name.name) > OUICHEFS_FILENAME_LEN)
@@ -621,6 +691,7 @@ static const struct inode_operations ouichefs_inode_ops = {
 	.lookup = ouichefs_lookup,
 	.create = ouichefs_create,
 	.link = ouichefs_link,
+	.symlink = ouichefs_symlink,
 	.unlink = ouichefs_unlink,
 	.mkdir  = ouichefs_mkdir,
 	.rmdir  = ouichefs_rmdir,

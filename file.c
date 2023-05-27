@@ -16,6 +16,8 @@
 #include "ouichefs.h"
 #include "bitmap.h"
 
+
+
 /*
  * Map the buffer_head passed in argument with the iblock-th block of the file
  * represented by inode. If the requested block is not allocated and create is
@@ -183,7 +185,72 @@ end:
 	return ret;
 }
 
-// définiton de l'ioctl 
+
+void f_iter(struct super_block *sb, void *arg) {
+	struct inode *new, *old;
+	struct ouichefs_iterate_sb *it_sb = (struct ouichefs_iterate_sb *)arg;
+	if (!uuid_equal(&sb->s_uuid, &it_sb->dl->uuid))
+		return;
+	
+	//on est dans le bon super block, on va chercher l'inode
+	new = ouichefs_iget(sb, it_sb->dl->inode);
+	if (IS_ERR(new))
+		return;
+
+	old = it_sb->inode; //pour faire iput
+	it_sb->inode = new; //nouvel inode
+	it_sb->file->f_inode = new;
+	it_sb->file->f_path.dentry->d_inode = new;
+
+	iput(old);
+}
+
+static int ouichefs_open(struct inode *inode, struct file *file) {
+    struct ouichefs_inode_info *ci;
+    struct super_block *sb;
+    struct buffer_head *bh;
+	struct ouichefs_iterate_sb it_sb;
+	struct ouichefs_distant_link recup_lien;
+
+
+    if (IS_DISTANT(inode->i_mode))
+	{
+        ci = OUICHEFS_INODE(inode);
+        bh = sb_bread(inode->i_sb, ci->index_block);
+		struct ouichefs_sb_info* sbi;
+
+        if(!bh)
+            return -EIO;
+
+        memcpy((void *)&recup_lien, (void *)bh->b_data, sizeof(recup_lien));
+		pr_info("le num d'inode %d\n",recup_lien.inode);
+		int i;
+		for (i=0;i<part_total;i++)
+		{
+			sbi = OUICHEFS_SB(tab_d_kobj[i].kobj_dentry->d_sb);
+			
+			if (uuid_equal(&(sbi->uuid),&recup_lien.uuid)==0)
+			{
+				
+				inode = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb, recup_lien.inode);
+				if (inode == NULL)
+				{
+					pr_warn("NO inode !!\n");
+					return -EIO;
+				}
+				pr_info("MAJ_data\n");
+				file->f_inode = inode;
+				file->f_path.dentry->d_inode = inode;
+				break;
+
+			}
+
+		}		
+
+    }
+
+    return simple_open (inode, file);
+}
 
 
 
@@ -197,6 +264,7 @@ const struct address_space_operations ouichefs_aops = {
 const struct file_operations ouichefs_file_ops = {
 	.owner      = THIS_MODULE,
 	.llseek     = generic_file_llseek,
+	.open		= ouichefs_open,
 	.read_iter  = generic_file_read_iter,
 	.write_iter = generic_file_write_iter,
 };

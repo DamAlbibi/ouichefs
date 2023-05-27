@@ -17,6 +17,20 @@
 #define OUICHEFS_MAX_FILESIZE     (1 << 22)  /* 4 MiB */
 #define OUICHEFS_FILENAME_LEN            28
 #define OUICHEFS_MAX_SUBFILES           128
+#define MAXMOUNT 						100
+
+#define DT_DISTANT 3
+#define IS_DISTANT(m)	((((m) & S_IFMT)>>12) == DT_DISTANT)
+
+
+extern int part_total;
+
+struct dentry_kobj
+{
+	struct dentry* kobj_dentry;
+	struct kobj_attribute kobj_att;
+};
+extern struct dentry_kobj tab_d_kobj[MAXMOUNT];
 
 
 /*
@@ -89,6 +103,18 @@ struct ouichefs_dir_block {
 		uint32_t inode;
 		char filename[OUICHEFS_FILENAME_LEN];
 	} files[OUICHEFS_MAX_SUBFILES];
+};
+
+// Structure pour écrire sur les liens distant 
+struct ouichefs_distant_link {
+	uuid_t uuid;
+	unsigned long inode;
+};
+
+struct ouichefs_iterate_sb {
+	struct ouichefs_distant_link *dl;
+	struct inode *inode;
+	struct file *file;
 };
 
 /* superblock functions */
