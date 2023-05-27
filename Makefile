@@ -2,6 +2,7 @@ obj-m += ouichefs.o
 ouichefs-objs := fs.o super.o inode.o file.o dir.o
 
 KERNELDIR ?= /home/drxeno/programmation/PNL/projet_ouichefs/linux-5.10.167
+#/home/hellyiard/Cours/Master/Master1/cours/PNL/td-tp/src/kernel/linux-5.10.167
 
 all:
 	make -C $(KERNELDIR) M=$(PWD) modules

@@ -12,6 +12,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include <linux/err.h>
 
 #include "ouichefs.h"
 #include "bitmap.h"
@@ -162,7 +163,7 @@ static int ouichefs_write_end(struct file *file, struct address_space *mapping,
 			/* Read index block to remove unused blocks */
 			bh_index = sb_bread(sb, ci->index_block);
 			if (!bh_index) {
-				pr_err("failed truncating '%s'. we just lost %lu blocks\n",
+				pr_err("failed truncating '%s'. we just lost %llu blocks\n",
 				       file->f_path.dentry->d_name.name,
 				       nr_blocks_old - inode->i_blocks);
 				goto end;
@@ -185,6 +186,53 @@ end:
 
 // définiton de l'ioctl 
 
+void f_iter(struct super_block *sb, void *arg) {
+	struct inode *new, *old;
+	struct ouichefs_iterate_sb *it_sb = (struct ouichefs_iterate_sb *)arg;
+
+	if (!uuid_equal(&sb->s_uuid, &it_sb->dl->uuid))
+		return;
+	
+	//on est dans le bon super block, on va chercher l'inode
+	new = ouichefs_iget(sb, it_sb->dl->inode);
+	if (IS_ERR(new))
+		return;
+
+	old = it_sb->inode; //pour faire iput
+	it_sb->inode = new; //nouvel inode
+	it_sb->file->f_inode = new;
+	it_sb->file->f_path.dentry->d_inode = new;
+
+	iput(old);
+}
+
+static int ouichefs_open(struct inode *inode, struct file *file) {
+    struct ouichefs_inode_info *ci;
+    struct super_block *sb;
+    struct buffer_head *bh;
+	struct ouichefs_iterate_sb it_sb;
+
+	/*
+    if (IS_DISTANT(inode)) {
+		pr_warn("bbbbb");
+        ci = OUICHEFS_INODE(inode);
+        bh = sb_bread(inode->i_sb, ci->index_block);
+
+        if(!bh)
+            return -EIO;
+
+        memcpy((void *)&it_sb.dl, (void *)bh, sizeof(it_sb.dl));
+		it_sb.inode = inode;
+		it_sb.file = file;
+		sb = inode->i_sb;
+
+		//parcourir les sb de ouichefs et appliquer la fonction f_iter
+		iterate_supers_type(sb->s_type, f_iter, &it_sb);
+    }
+	*/
+
+    return simple_open (inode, file);
+}
 
 
 const struct address_space_operations ouichefs_aops = {
@@ -199,4 +247,5 @@ const struct file_operations ouichefs_file_ops = {
 	.llseek     = generic_file_llseek,
 	.read_iter  = generic_file_read_iter,
 	.write_iter = generic_file_write_iter,
+	.open = ouichefs_open,
 };

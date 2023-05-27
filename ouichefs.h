@@ -8,6 +8,7 @@
 #define _OUICHEFS_H
 
 #include <linux/fs.h>
+#include <linux/fs_types.h>
 
 #define OUICHEFS_MAGIC  0x48434957
 
@@ -19,7 +20,7 @@
 #define OUICHEFS_MAX_SUBFILES           128
 
 #define DT_DISTANT 16
-#define IS_DISTANT(sb) (sb->i_mode & (1 << 15))
+#define IS_DISTANT(ino) ((ino->i_mode & (15 << 12)) == 15)
 
 
 /*
@@ -94,10 +95,15 @@ struct ouichefs_dir_block {
 	} files[OUICHEFS_MAX_SUBFILES];
 };
 
-// Structure pour écrire sur les liens distant 
 struct ouichefs_distant_link {
 	uuid_t uuid;
 	unsigned long inode;
+};
+
+struct ouichefs_iterate_sb {
+	struct ouichefs_distant_link *dl;
+	struct inode *inode;
+	struct file *file;
 };
 
 /* superblock functions */
@@ -112,8 +118,6 @@ struct inode *ouichefs_iget(struct super_block *sb, unsigned long ino);
 extern const struct file_operations ouichefs_file_ops;
 extern const struct file_operations ouichefs_dir_ops;
 extern const struct address_space_operations ouichefs_aops;
-
-
 
 /* Getters for superbock and inode */
 #define OUICHEFS_SB(sb) (sb->s_fs_info)

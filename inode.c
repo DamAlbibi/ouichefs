@@ -121,7 +121,7 @@ static struct dentry *ouichefs_lookup(struct inode *dir, struct dentry *dentry,
 	dblock = (struct ouichefs_dir_block *)bh->b_data;
 
 	/* Search for the file in directory */
-	for (i = 0; i < OUICHEFS_MAX_SUBFILES; i++) {
+	for (i = 0; i < OUICHEFS_MAX_SUBFILES; ++i) {
 		f = &dblock->files[i];
 		if (!f->inode)
 			break;
@@ -157,7 +157,8 @@ static struct inode *ouichefs_new_inode(struct inode *dir, mode_t mode)
 
 	/* Check mode before doing anything to avoid undoing everything */
 	if (!S_ISDIR(mode) && !S_ISREG(mode)) {
-		pr_err("File type not supported (only directory and regular files supported)\n");
+		pr_err("File type not supported (only directory and regular files \
+				supported)\n");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -171,11 +172,13 @@ static struct inode *ouichefs_new_inode(struct inode *dir, mode_t mode)
 	ino = get_free_inode(sbi);
 	if (!ino)
 		return ERR_PTR(-ENOSPC);
+
 	inode = ouichefs_iget(sb, ino);
 	if (IS_ERR(inode)) {
 		ret = PTR_ERR(inode);
 		goto put_ino;
 	}
+
 	ci = OUICHEFS_INODE(inode);
 
 	/* Get a free block for this new inode's index */
@@ -201,7 +204,6 @@ static struct inode *ouichefs_new_inode(struct inode *dir, mode_t mode)
 	}
 
 	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode);
-
 	return inode;
 
 put_inode:
@@ -270,9 +272,10 @@ static int ouichefs_create(struct inode *dir, struct dentry *dentry,
 	brelse(bh2);
 
 	/* Find first free slot in parent index and register new inode */
-	for (i = 0; i < OUICHEFS_MAX_SUBFILES; i++)
+	for (i = 0; i < OUICHEFS_MAX_SUBFILES; ++i)
 		if (dblock->files[i].inode == 0)
 			break;
+
 	dblock->files[i].inode = inode->i_ino;
 	strncpy(dblock->files[i].filename,
 		dentry->d_name.name, OUICHEFS_FILENAME_LEN);
@@ -301,52 +304,52 @@ end:
 }
 
 
-// Fonction de lien symbolique utilisée pour les liens distant 
-
+/**
+ * Fonction de lien symbolique utilisée pour les liens distant 
+ */
 static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const char *pathname) {
 
-	// Récuperation de la dentry 
-	int error = 0;
-	struct path path;
-	error = kern_path(pathname, LOOKUP_FOLLOW, &path);
-	if (error)
-		return ERR_PTR(error);
-	
-	
-	struct inode *new_inode; // Inode du nouveau
-	
-
-	struct dentry* old_dentry = path.dentry;	
-	struct inode *inode = d_inode(old_dentry);
-
+	/* Recuperation de la dentry */
 	struct super_block *old, *new;
 	struct buffer_head *bh;
+	struct inode *inode;
+	struct inode *new_inode; // Inode du nouveau
+	struct dentry *old_dentry;
 	struct ouichefs_distant_link dist_link;
+	struct path path;
+	int error = 0;
+
+	error = kern_path(pathname, LOOKUP_FOLLOW, &path);
+	if (error)
+		return error;
+
+	old_dentry = path.dentry;	
+	inode = d_inode(old_dentry);
 
 	old = old_dentry->d_sb;
 	new = new_dentry->d_sb;
 
-	if (strncmp("ouichefs", old->s_type->name, 8) != 0 || strncmp("ouichefs", new->s_type->name, 8) != 0)
+	if (strncmp("ouichefs", old->s_type->name, 8) != 0
+			|| strncmp("ouichefs", new->s_type->name, 8) != 0)
 		return -EINVAL;
 
-	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); // Update des temps de l'inode 
-	inode_inc_link_count(inode); // Incrémenter le cpt de lien 
+	/* Update des temps de l'inode */
+	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode);
+	inode_inc_link_count(inode); /* Incrémenter le cpt de lien */
 	ihold(inode);
 
 	if (uuid_equal(&old->s_uuid, &new->s_uuid)) {
-		pr_debug("Lien symbolique non-implementé");
+		pr_debug("Lien symbolique non-implemente");
 		return -EINVAL;
 	}
 	else {
-		ouichefs_create(dir, new_dentry, inode->i_mode, 0);
-
-		//distant link
-
+		/* distant link */
+		error = ouichefs_create(dir, new_dentry, inode->i_mode, 0);
+		if (error)
+			return error;
 		new_inode = new_dentry->d_inode;
-		if (new_inode == NULL)
-			return 0; //check ERRCODE
 
-		new_inode->i_mode |= (1 << 15); //first bit = mark for distant link
+		new_inode->i_mode |= DT_LNK; //first bit = mark for distant link
 		bh = sb_bread(new, OUICHEFS_INODE(new_inode)->index_block);
 		if(!bh)
 			return -EIO;
@@ -362,14 +365,10 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 
 	return 0;
 }
-	
 
-
-
-
-/*
- * Fonction d'ajout du nouveau fichier créer par un link
- */
+/**
+  * Fonction d'ajout du nouveau fichier creer par un link
+  */
 
 int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 {
@@ -377,23 +376,25 @@ int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 	struct dentry *father = new_dentry->d_parent;
 	struct inode* father_inode = d_inode(father);
 	struct ouichefs_inode_info *ci = OUICHEFS_INODE(father_inode);
-	struct buffer_head *bh_old = NULL, *bh_new = NULL;
+	struct buffer_head *bh_new = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	int i;
 
-	// Vérification de la taille du nom
+	/* Verification de la taille du nom */
 	if (strlen(new_dentry->d_name.name) > OUICHEFS_FILENAME_LEN)
 		return -ENAMETOOLONG;
 	
 	bh_new = sb_bread(sb, ci->index_block);
 	if (!bh_new)
 		return -EIO;
+	
 	dir_block = (struct ouichefs_dir_block *)bh_new->b_data;
-	// Recherche du premier free-slot
-	for (i = 0; i < OUICHEFS_MAX_SUBFILES; i++){
+	/* Recherche du premier free-slot */
+	for (i = 0; i < OUICHEFS_MAX_SUBFILES; ++i){
 		if (dir_block->files[i].inode == 0)
 			break;
 	}
+
 	dir_block->files[i].inode = inode->i_ino;
 	strncpy(dir_block->files[i].filename,
 		new_dentry->d_name.name, OUICHEFS_FILENAME_LEN);
@@ -401,26 +402,26 @@ int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 	brelse(bh_new);
 
 	return 0;
-
 }
 
-/*
+/**
  * Fonction de lien pour ouichfs
  */
-
 static int ouichefs_link(struct dentry *old_dentry, struct inode *dir, 
 		struct dentry * dentry)
 {
 
 	struct inode *inode = d_inode(old_dentry);
-	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); // Update des temps de l'inode 
+
+	/* Update des temps de l'inode */
+	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); 
 	inode_inc_link_count(inode); // Incrémenter le cpt de lien 
+
 	ihold(inode);
-	if (ouichefs_add_link(dentry,inode)==0){
+	if (!ouichefs_add_link(dentry,inode)){
 		dget(dentry);
 		d_instantiate(dentry,inode);
 	}
-		
 
 	return 0;
 }
@@ -453,8 +454,9 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	dir_block = (struct ouichefs_dir_block *)bh->b_data;
 
 	/* Search for inode in parent index and get number of subfiles */
-	for (i = 0; i < OUICHEFS_MAX_SUBFILES; i++) {
-		if (dir_block->files[i].inode == ino && strcmp(dir_block->files[i].filename,dentry->d_name.name)==0)
+	for (i = 0; i < OUICHEFS_MAX_SUBFILES; ++i) {
+		if (dir_block->files[i].inode == ino
+				&& strcmp(dir_block->files[i].filename,dentry->d_name.name)==0)
 			f_id = i;
 		else if (dir_block->files[i].inode == 0)
 			break;
@@ -464,8 +466,9 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	/* Remove file from parent directory */
 	if (f_id != OUICHEFS_MAX_SUBFILES - 1)
 		memmove(dir_block->files + f_id,
-			dir_block->files + f_id + 1,
-			(nr_subs - f_id - 1) * sizeof(struct ouichefs_file));
+				dir_block->files + f_id + 1,
+				(nr_subs - f_id - 1) * sizeof(struct ouichefs_file));
+
 	memset(&dir_block->files[nr_subs - 1],
 	       0, sizeof(struct ouichefs_file));
 	mark_buffer_dirty(bh);
@@ -474,34 +477,30 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	/* Update inode stats */
 	dir->i_mtime = dir->i_atime = dir->i_ctime = current_time(dir);
 	if (S_ISDIR(inode->i_mode))
-	{
 		inode_dec_link_count(dir);
-	}
 	else
-	{
 		inode_dec_link_count(inode);
-	} 
 
 	mark_inode_dirty(dir);
 
 	if (inode->i_nlink!=0)
 		return 0;
-	
-	
+
 	/*
 	 * Cleanup pointed blocks if unlinking a file. If we fail to read the
 	 * index block, cleanup inode anyway and lose this file's blocks
 	 * forever. If we fail to scrub a data block, don't fail (too late
 	 * anyway), just put the block and continue.
 	 */
-	
+
 	bh = sb_bread(sb, bno);
 	if (!bh)
 		goto clean_inode;
+
 	file_block = (struct ouichefs_file_index_block *)bh->b_data;
 	if (S_ISDIR(inode->i_mode))
 		goto scrub;
-	for (i = 0; i < inode->i_blocks - 1; i++) {
+	for (i = 0; i < inode->i_blocks - 1; ++i) {
 		char *block;
 
 		if(!file_block->blocks[i])
@@ -511,6 +510,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 		bh2 = sb_bread(sb, file_block->blocks[i]);
 		if (!bh2)
 			continue;
+
 		block = (char *)bh2->b_data;
 		memset(block, 0, OUICHEFS_BLOCK_SIZE);
 		mark_buffer_dirty(bh2);
@@ -531,9 +531,7 @@ clean_inode:
 	i_uid_write(inode, 0);
 	i_gid_write(inode, 0);
 	inode->i_mode = 0;
-	inode->i_ctime.tv_sec =
-		inode->i_mtime.tv_sec =
-		inode->i_atime.tv_sec = 0;
+	inode->i_ctime.tv_sec = inode->i_mtime.tv_sec = inode->i_atime.tv_sec = 0;
 	mark_inode_dirty(inode);
 
 	/* Free inode and index block from bitmap */
@@ -622,7 +620,7 @@ static int ouichefs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		return -EIO;
 	dir_block = (struct ouichefs_dir_block *)bh_old->b_data;
 	/* Search for inode in old directory and number of subfiles */
-	for (i = 0; OUICHEFS_MAX_SUBFILES; i++) {
+	for (i = 0; OUICHEFS_MAX_SUBFILES; ++i) {
 		if (dir_block->files[i].inode == src->i_ino)
 			f_id = i;
 		else if (dir_block->files[i].inode == 0)
