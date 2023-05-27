@@ -14,11 +14,11 @@ DISTANT_LINK=lien_distant
 
 # Creation lien distant
 
-echo -e "\nCreation d'un lien distant entre part1/fic et part2/lien_distant\n"
+echo -e "\nCreation d'un lien distant entre part1/fic et part2/lien_distant : \n"
 
 cd $DIR_PART
 touch $FILE_FIC
-ln -s $FILE_FIC $DISTANT_LINK
+ln -s $FILE_FIC "../${DIR_PART2}/$DISTANT_LINK"
 
 echo "TEST" >> $FILE_FIC
 
