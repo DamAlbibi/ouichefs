@@ -51,7 +51,7 @@ static ssize_t ouichfs_part_show(struct kobject *kobj,
         }
         __u8 tab[UUID_SIZE]; 
         export_uuid(tab, &sb->s_uuid);
-        return snprintf(buf, PAGE_SIZE, "\nUUID = %pUb\nNombre total inode = %d\nNombre d'inode pointe par au moins 2 fichiers = %d\n", tab, nbr_inode, nbr_inode_2_hard_link);
+        return snprintf(buf, PAGE_SIZE, "UUID = %pUb\nNombre total inode = %d\nNombre d'inode pointe par au moins 2 fichiers = %d\n", tab, nbr_inode, nbr_inode_2_hard_link);
 }
 
 

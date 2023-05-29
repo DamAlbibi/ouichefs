@@ -22,6 +22,7 @@ ln -s $FILE_FIC "../${DIR_PART2}/$DISTANT_LINK"
 
 echo "TEST" >> $FILE_FIC
 
+cd ..
 echo -n "Contenu fichier fic : "
 cat "${DIR_PART}/$FILE_FIC"
 echo -n "Contenu fichier lien_distant : "
