@@ -19,8 +19,7 @@
 #define OUICHEFS_MAX_SUBFILES           128
 #define MAXMOUNT 						100
 
-#define DT_DISTANT 3
-#define IS_DISTANT(m)	((((m) & S_IFMT)>>12) == DT_DISTANT)
+
 
 
 extern int part_total;

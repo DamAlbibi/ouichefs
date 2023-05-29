@@ -187,7 +187,7 @@ static long ouichefs_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
 						for (i=0; i< OUICHEFS_MAX_SUBFILES;i++)
 						{
 							if (dblock->files[i].inode == ino)
-								pr_info("%s \n",dblock->files[i].filename);
+								pr_info("%s \n",dblock->files[i].filename); // MODIF : ne pas faire un affichage mais renvoyer le PTR 
 						}	
 					}
 			}			
