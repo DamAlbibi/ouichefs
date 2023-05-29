@@ -28,39 +28,30 @@
 
 int part_total = 0;
 struct dentry_kobj tab_d_kobj[MAXMOUNT];
-char uid_parse[8];
-
 
 static ssize_t ouichfs_part_show(struct kobject *kobj, 
         struct kobj_attribute *attr, char *buf) 
 {
-		int i;
-		for(i=0;i<MAXMOUNT;i++)
-		{
-			if (&tab_d_kobj[i].kobj_att == attr)
-				break;
-		}
+        int i;
+        for(i=0;i<MAXMOUNT;i++) {
+                if (&tab_d_kobj[i].kobj_att == attr)
+                        break;
+        }
       	struct super_block *sb = tab_d_kobj[i].kobj_dentry->d_sb;
-		struct ouichefs_sb_info *sbi = OUICHEFS_SB(sb);
+	struct ouichefs_sb_info *sbi = OUICHEFS_SB(sb);
         uint32_t nbr_inode = sbi->nr_inodes;
         uint32_t nbr_inode_2_hard_link = 0;
-		struct inode* inode = NULL;
+	struct inode* inode = NULL;
         unsigned long ino;
-        for (ino = 0; ino < nbr_inode; ino++)
-		{
+        for (ino = 0; ino < nbr_inode; ino++) {
                 inode = ouichefs_iget(sb, ino);
-                if (inode->i_nlink >= 2 && !S_ISDIR(inode->i_mode))
-				{
+                if (inode->i_nlink >= 2 && !S_ISDIR(inode->i_mode)) {
                         nbr_inode_2_hard_link++;
                 }
         }
-		__u8 tab[UUID_SIZE]; // MODIF : print le uuis dans le snprintf
-		export_uuid(tab, &sb->s_uuid);
-		for(i = 0; i < 16; ++i) {
-			pr_warn("%d", tab[i]);
-		}
-		
-        return snprintf(buf, PAGE_SIZE, "Nombre total inode = %d\n Nombre d'inode pointe par au moins 2 fichiers = %d\n", nbr_inode, nbr_inode_2_hard_link);
+        __u8 tab[UUID_SIZE]; 
+        export_uuid(tab, &sb->s_uuid);
+        return snprintf(buf, PAGE_SIZE, "UUID = %pUb\nNombre total inode = %d\nNombre d'inode pointe par au moins 2 fichiers = %d\n", tab, nbr_inode, nbr_inode_2_hard_link);
 }
 
 
@@ -235,15 +226,14 @@ static int __init ouichefs_init(void)
 		goto end;
 	}
 	// Creation du kernel object 
-	if (!(ouichfs_part = kobject_create_and_add("ouichfs_part", kernel_kobj)))
-	{
+	if (!(ouichfs_part = kobject_create_and_add("ouichfs_part", kernel_kobj))) {
 		pr_err("kobject_create_and_add failed\n");
-    }
+        }
 	// Ajout de l'ioctl 
 	major_allocated = register_chrdev(0,DEVICE_NAME,&fops);
 	pr_info("Le major %d\n",major_allocated);
 	if (ret<0)
-		 return ENOMEM;
+		return ENOMEM;
 
 	pr_info("module loaded\n");
 end:
@@ -253,14 +243,12 @@ end:
 static void __exit ouichefs_exit(void)
 {
 	int ret;
-	int i;
 	ret = unregister_filesystem(&ouichefs_file_system_type);
 	if (ret)
 		pr_err("unregister_filesystem() failed\n");
 
 	ouichefs_destroy_inode_cache();
 
-	for (i=0;i<part_total;i++)
     	kobject_put(ouichfs_part);
 
 	unregister_chrdev(major_allocated,DEVICE_NAME);
