@@ -69,19 +69,19 @@ struct dentry *ouichefs_mount(struct file_system_type *fs_type, int flags,
 	if (IS_ERR(dentry))
 		pr_err("'%s' mount failure\n", dev_name);
 	else {
-				int ret;
-				char*  nombre = kmalloc(GFP_KERNEL,4*sizeof(char));
-				sprintf(nombre,"%d",part_total);
-				nombre[4] ='\0';
-				tab_d_kobj[part_total].kobj_dentry = dentry;
-				tab_d_kobj[part_total].kobj_att.attr.name = nombre;
-				tab_d_kobj[part_total].kobj_att.attr.mode = 0600;
-				tab_d_kobj[part_total].kobj_att.show = ouichfs_part_show;
-				tab_d_kobj[part_total].kobj_att.store = NULL;
+                int ret;
+                char*  nombre = kmalloc(GFP_KERNEL,4*sizeof(char));
+                sprintf(nombre,"%d",part_total);
+                nombre[4] ='\0';
+                tab_d_kobj[part_total].kobj_dentry = dentry;
+                tab_d_kobj[part_total].kobj_att.attr.name = nombre;
+                tab_d_kobj[part_total].kobj_att.attr.mode = 0600;
+                tab_d_kobj[part_total].kobj_att.show = ouichfs_part_show;
+                tab_d_kobj[part_total].kobj_att.store = NULL;
 
-				ret = sysfs_create_file(ouichfs_part,&(tab_d_kobj[part_total].kobj_att.attr));
-				if (ret<0)
-					pr_info("fail to create sysfs\n");
+                ret = sysfs_create_file(ouichfs_part,&(tab_d_kobj[part_total].kobj_att.attr));
+                if (ret<0)
+                        pr_info("fail to create sysfs\n");
                 pr_info("'%s' mount success\n", dev_name);
 				part_total++;
         }

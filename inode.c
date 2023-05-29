@@ -184,6 +184,7 @@ static struct inode *ouichefs_new_inode(struct inode *dir, mode_t mode)
 		goto put_inode;
 	}
 	ci->index_block = bno;
+        ci->nr_distant_link = 0;
 
 	/* Initialize inode */
 	inode_init_owner(inode, dir, mode);
@@ -310,13 +311,13 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 	// Récuperation de la dentry 
 	int error = 0;
 	struct path path;
+        
 	error = kern_path(pathname, LOOKUP_FOLLOW, &path);
 	if (error)
 		return ERR_PTR(error);
 	
 	struct inode *new_inode; // Inode du nouveau
 	
-
 	struct dentry* old_dentry = path.dentry;	
 	struct inode *inode = d_inode(old_dentry);
 
@@ -349,6 +350,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		//distant link
 
 		new_inode = new_dentry->d_inode;
+                
 		if (new_inode == NULL)
 			return 0; //check ERRCODE
 		/*new_inode->i_mode &= ~ (S_IFREG); // On enlève le regular_file
@@ -358,18 +360,18 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		if(!bh)
 			return -EIO;
 
-		
 		uuid_copy(&dist_link.uuid, &old->s_uuid);
 		dist_link.inode = inode->i_ino;
 		fblock = (char *)bh->b_data;
 		memcpy(fblock, (void *)&dist_link, sizeof(dist_link));
 		mark_buffer_dirty(bh);
 		brelse(bh);
-		pr_info("le nombre de lien et la taile à la création : %d,%d\n",new_inode->i_nlink,new_inode->i_size);
+		pr_info("le nombre de lien et la taile à la création : %d, %d\n", new_inode->i_nlink, new_inode->i_size);
 
 		inode->i_size += sizeof(struct ouichefs_distant_link);
 		inode->i_blocks = inode->i_size / OUICHEFS_BLOCK_SIZE + 2;
 		inode->i_mtime = inode->i_ctime = current_time(inode);
+                
 		mark_inode_dirty(new_inode);
 		mark_inode_dirty(inode);
 	}
@@ -452,11 +454,34 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	struct buffer_head *bh = NULL, *bh2 = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	struct ouichefs_file_index_block *file_block = NULL;
+        struct ouichefs_distant_link *distant_link;
+        struct ouichefs_inode_info *inode_info;
+        struct inode *inode_file;
 	uint32_t ino, bno;
 	int i, f_id = -1, nr_subs = 0;
 
 	ino = inode->i_ino;
 	bno = OUICHEFS_INODE(inode)->index_block;
+
+        if (S_ISLNK(inode->i_mode)) {
+                bh = sb_bread(inode->i_sb, bno);
+                distant_link = (struct ouichefs_distant_link*) bh->b_data;
+
+                for (i=0;i<part_total;i++) {
+			sbi = OUICHEFS_SB(tab_d_kobj[i].kobj_dentry->d_sb);
+			
+			if (uuid_equal(&(sbi->uuid),&distant_link->uuid)) {
+				inode_file = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb, distant_link->inode);
+				if (IS_ERR(inode_file)) {
+                                        return PTR_ERR(inode_file);
+                                }
+                                break;
+			}
+		}	
+
+                inode_dec_link_count(inode_file);
+                mark_inode_dirty(inode_file);
+        }
 
 	/* Read parent directory index */
 	bh = sb_bread(sb, OUICHEFS_INODE(dir)->index_block);
