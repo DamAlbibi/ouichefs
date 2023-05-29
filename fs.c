@@ -54,7 +54,7 @@ static ssize_t ouichfs_part_show(struct kobject *kobj,
                         nbr_inode_2_hard_link++;
                 }
         }
-		__u8 tab[UUID_SIZE]; 
+		__u8 tab[UUID_SIZE]; // MODIF : print le uuis dans le snprintf
 		export_uuid(tab, &sb->s_uuid);
 		for(i = 0; i < 16; ++i) {
 			pr_warn("%d", tab[i]);
@@ -196,7 +196,7 @@ static long ouichefs_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
 						for (i=0; i< OUICHEFS_MAX_SUBFILES;i++)
 						{
 							if (dblock->files[i].inode == ino)
-								pr_info("%s \n",dblock->files[i].filename);
+								pr_info("%s \n",dblock->files[i].filename); // MODIF : ne pas faire un affichage mais renvoyer le PTR 
 						}	
 					}
 			}			

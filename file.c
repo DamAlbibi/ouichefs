@@ -186,7 +186,7 @@ end:
 }
 
 
-void f_iter(struct super_block *sb, void *arg) {
+/*void f_iter(struct super_block *sb, void *arg) {
 	struct inode *new, *old;
 	struct ouichefs_iterate_sb *it_sb = (struct ouichefs_iterate_sb *)arg;
 	if (!uuid_equal(&sb->s_uuid, &it_sb->dl->uuid))
@@ -203,27 +203,32 @@ void f_iter(struct super_block *sb, void *arg) {
 	it_sb->file->f_path.dentry->d_inode = new;
 
 	iput(old);
-}
+}*/
 
 static int ouichefs_open(struct inode *inode, struct file *file) {
     struct ouichefs_inode_info *ci;
     struct super_block *sb;
     struct buffer_head *bh;
-	struct ouichefs_iterate_sb it_sb;
+	//struct ouichefs_iterate_sb it_sb;
 	struct ouichefs_distant_link recup_lien;
+	//struct inode *new_inode;
+	char *fblock = NULL;
+	struct inode* new_inode;
 
 
-    if (IS_DISTANT(inode->i_mode))
+    if (S_ISLNK(inode->i_mode))
 	{
+
         ci = OUICHEFS_INODE(inode);
         bh = sb_bread(inode->i_sb, ci->index_block);
 		struct ouichefs_sb_info* sbi;
 
         if(!bh)
             return -EIO;
-
-        memcpy((void *)&recup_lien, (void *)bh->b_data, sizeof(recup_lien));
-		pr_info("le num d'inode %d\n",recup_lien.inode);
+		
+		fblock = (char*)bh->b_data;
+        memcpy(&recup_lien, fblock, sizeof(recup_lien));
+		
 		int i;
 		for (i=0;i<part_total;i++)
 		{
@@ -232,16 +237,17 @@ static int ouichefs_open(struct inode *inode, struct file *file) {
 			if (uuid_equal(&(sbi->uuid),&recup_lien.uuid)==0)
 			{
 				
-				inode = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb, recup_lien.inode);
-				if (inode == NULL)
+				new_inode = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb, recup_lien.inode);
+				if (new_inode == NULL)
 				{
 					pr_warn("NO inode !!\n");
 					return -EIO;
 				}
-				pr_info("MAJ_data\n");
-				file->f_inode = inode;
-				file->f_path.dentry->d_inode = inode;
-				break;
+				pr_info("%d l'inode \n",recup_lien.inode);
+				file->f_inode = new_inode;
+				file->f_path.dentry->d_inode = new_inode;
+
+				return simple_open(new_inode,file);
 
 			}
 
