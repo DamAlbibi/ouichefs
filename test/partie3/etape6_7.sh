@@ -25,6 +25,6 @@ echo "TEST" >> $FILE_FIC
 cd ..
 echo -n "Contenu fichier fic : "
 cat "${DIR_PART}/$FILE_FIC"
-echo -n "Contenu fichier lien_distant : "
+echo -en "Contenu fichier lien_distant : \n"
 # cat "${DIR_PART2}/$DISTANT_LINK"
 

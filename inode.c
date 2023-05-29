@@ -184,7 +184,6 @@ static struct inode *ouichefs_new_inode(struct inode *dir, mode_t mode)
 		goto put_inode;
 	}
 	ci->index_block = bno;
-        ci->nr_distant_link = 0;
 
 	/* Initialize inode */
 	inode_init_owner(inode, dir, mode);
@@ -308,7 +307,7 @@ end:
 
 static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const char *pathname) {
 
-	// Récuperation de la dentry 
+	// Recuperation de la dentry 
 	int error = 0;
 	struct path path;
         
@@ -333,16 +332,14 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		return -EINVAL;
 
 	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); // Update des temps de l'inode 
-	inode_inc_link_count(inode); // Incrémenter le cpt de lien 
+	// inode_inc_link_count(inode); // Incrémenter le cpt de lien 
 	ihold(inode);
 	mark_inode_dirty(inode);
 
 	if (uuid_equal(&old->s_uuid, &new->s_uuid)) {
 		pr_debug("Lien symbolique non-implementé");
 		return -EINVAL;
-	}
-	else
-	{
+	} else {
 		mode_t creat_mode =  S_IFLNK | 0777;
 		ouichefs_create(dir, new_dentry,creat_mode, 0);
 		
@@ -449,20 +446,21 @@ static int ouichefs_link(struct dentry *old_dentry, struct inode *dir,
 static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct super_block *sb = dir->i_sb;
-	struct ouichefs_sb_info *sbi = OUICHEFS_SB(sb);
-	struct inode *inode = d_inode(dentry);
+	struct ouichefs_sb_info *sbi2, *sbi = OUICHEFS_SB(sb);
+	struct inode *distant_inode, *inode = d_inode(dentry);
 	struct buffer_head *bh = NULL, *bh2 = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	struct ouichefs_file_index_block *file_block = NULL;
         struct ouichefs_distant_link *distant_link;
         struct ouichefs_inode_info *inode_info;
-        struct inode *inode_file;
 	uint32_t ino, bno;
-	int i, f_id = -1, nr_subs = 0;
+        uint8_t has_distant_link;
+	int i, j, f_id = -1, nr_subs = 0;
 
 	ino = inode->i_ino;
 	bno = OUICHEFS_INODE(inode)->index_block;
 
+        /*
         if (S_ISLNK(inode->i_mode)) {
                 bh = sb_bread(inode->i_sb, bno);
                 distant_link = (struct ouichefs_distant_link*) bh->b_data;
@@ -477,11 +475,12 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                                 }
                                 break;
 			}
-		}	
+		}
 
                 inode_dec_link_count(inode_file);
                 mark_inode_dirty(inode_file);
         }
+        */
 
 	/* Read parent directory index */
 	bh = sb_bread(sb, OUICHEFS_INODE(dir)->index_block);
@@ -510,20 +509,62 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 
 	/* Update inode stats */
 	dir->i_mtime = dir->i_atime = dir->i_ctime = current_time(dir);
-	if (S_ISDIR(inode->i_mode))
-	{
+	if (S_ISDIR(inode->i_mode)){
 		inode_dec_link_count(dir);
-	}
-	else
-	{
-		inode_dec_link_count(inode);
+	} else {
+                // Test si existence d'un lien distant sur une autre partition
+                has_distant_link = 0;
+                if (inode->i_nlink == 1) {
+                        for (i=0;i<part_total;i++) {
+                                sbi2 = OUICHEFS_SB(tab_d_kobj[i].kobj_dentry->d_sb);
+                                if (uuid_equal(&(sbi2->uuid), &sb->s_uuid) == 0) {
+                                        for (j = 0; j < sbi2->nr_inodes; j++) {
+                                                distant_inode = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb, inode->i_ino);
+                                                if (IS_ERR(distant_inode)) {
+                                                        return PTR_ERR(distant_inode);
+                                                }
+                                                if (S_ISLNK(distant_inode->i_mode)) {
+                                                        bh = sb_bread(distant_inode->i_sb, OUICHEFS_INODE(distant_inode)->index_block);
+                                                        distant_link = (struct ouichefs_distant_link*) bh->b_data;
+
+                                                        pr_info("distant inode ino = %ld, inode i_ino = %ld", distant_link->inode, inode->i_ino);
+
+                                                        if ((distant_link->inode == inode->i_ino) && (uuid_equal(&(distant_link->uuid), &(sb->s_uuid)))) {
+                                                                pr_info("omg");
+                                                                has_distant_link = 1;
+                                                                goto end_test_distant_link;
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
+                }
+
+end_test_distant_link:
+                pr_info("patate");
+
+                if (has_distant_link) {
+                        pr_info("Il faut faire une migration");
+                        pr_info("inode block = %d", inode->i_blocks);
+
+                        /*
+                        for (i = 0; i < inode->i_blocks; i++) {
+
+                        }
+                        */
+                        inode_dec_link_count(inode);
+                } else {
+                        pr_info("bruhhhh");
+                        inode_dec_link_count(inode);
+                }
+
+                pr_info("chaude");
 	} 
 
 	mark_inode_dirty(dir);
 
 	if (inode->i_nlink!=0)
-		return 0;
-	
+                return 0;
 	
 	/*
 	 * Cleanup pointed blocks if unlinking a file. If we fail to read the
