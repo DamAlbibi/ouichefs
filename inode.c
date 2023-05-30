@@ -373,7 +373,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		inode->i_blocks = inode->i_size / OUICHEFS_BLOCK_SIZE + 2;
 		inode->i_mtime = inode->i_ctime = current_time(inode);
                 */
-                inode_inc_link_count(inode);
+                // inode_inc_link_count(inode);
                 mark_inode_dirty(new_inode);
 		mark_inode_dirty(inode);
 	}
@@ -468,6 +468,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	ino = inode->i_ino;
 	bno = OUICHEFS_INODE(inode)->index_block;
 
+        /*
         if (S_ISLNK(inode->i_mode)) {
                 bh = sb_bread(inode->i_sb, bno);
                 distant_link = (struct ouichefs_distant_link*) bh->b_data;
@@ -487,6 +488,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                 inode_dec_link_count(inode_file);
                 mark_inode_dirty(inode_file);
         }
+        */
         
 	/* Read parent directory index */
 	bh = sb_bread(sb, OUICHEFS_INODE(dir)->index_block);
@@ -524,7 +526,6 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                         compteur de reference, i_nlink doit donc seulement etre un compteur
                         de lien locaux
                 */
-                /*
                 has_distant_link = 0;
                 if (inode->i_nlink == 1) {
                         for (i=0;i<part_total;i++) {
@@ -552,25 +553,14 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 end_test_distant_link:
 
                 if (has_distant_link) {
-                        pr_info("Il faut faire une migration");
-                        pr_info("inode block = %d", inode->i_blocks);
+                        // pr_info("Il faut faire une migration");
+                        // pr_info("inode block = %d", inode->i_blocks);
 
                         distant_inode->i_mode = S_IFREG | 0777;
 
-                        for (i = 0; i < inode->i_blocks; i++) {
-
-                                bh = sb_bread(inode->i_sb, OUICHEFS_INODE(inode)->index_block + i);
-                                bh2 = sb_bread(distant_inode->i_sb, OUICHEFS_INODE(distant_inode)->index_block + i);
-                                
-		                memcpy((char*)&bh2->b_data, (char*)&bh->b_data, OUICHEFS_BLOCK_SIZE);
-                                mark_buffer_dirty(bh2);
-                        }
-                        inode_dec_link_count(inode);
                         mark_inode_dirty(distant_inode);
                         mark_inode_dirty(inode);
                 }
-                */
-
 
                 inode_dec_link_count(inode);
 	} 
@@ -629,7 +619,7 @@ clean_inode:
 		inode->i_mtime.tv_sec =
 		inode->i_atime.tv_sec = 0;
 	mark_inode_dirty(inode);
-        pr_info("i_link = %d", inode->i_link);
+        // pr_info("i_link = %d", inode->i_link);
         iput(inode);
 
 	/* Free inode and index block from bitmap */

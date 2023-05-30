@@ -1,2 +1,0 @@
-Idee de test pour cette partie, on pourrait donc enclencher le mecanisme puis montrer que le lien distant 
-c'est bien transformer en "vrai fichier" (utiliser ls pour observer le changement)

@@ -1,0 +1,9 @@
+clean.sh : Permet de nettoyer les fichiers et repertoire apres execution du test
+
+----------------------------------
+
+etape8.sh : Test sur la migration d'un lien local vers un lien distant
+
+Passage du test : OK
+
+----------------------------------
