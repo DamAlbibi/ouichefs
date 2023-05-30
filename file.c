@@ -62,7 +62,7 @@ static int ouichefs_file_get_block(struct inode *inode, sector_t iblock,
 		bno = index->blocks[iblock];
 	}
 
-	/* Map the physical block to to the given buffer_head */
+	/* Map the physical block to the given buffer_head */
 	map_bh(bh_result, sb, bno);
 
 brelse_index:
@@ -164,7 +164,7 @@ static int ouichefs_write_end(struct file *file, struct address_space *mapping,
 			/* Read index block to remove unused blocks */
 			bh_index = sb_bread(sb, ci->index_block);
 			if (!bh_index) {
-				pr_err("failed truncating '%s'. we just lost %lu blocks\n",
+				pr_err("failed truncating \'%s\'. we just lost %llu blocks\n",
 				       file->f_path.dentry->d_name.name,
 				       nr_blocks_old - inode->i_blocks);
 				goto end;
@@ -186,69 +186,44 @@ end:
 }
 
 
-/*void f_iter(struct super_block *sb, void *arg) {
-	struct inode *new, *old;
-	struct ouichefs_iterate_sb *it_sb = (struct ouichefs_iterate_sb *)arg;
-	if (!uuid_equal(&sb->s_uuid, &it_sb->dl->uuid))
-		return;
-	
-	//on est dans le bon super block, on va chercher l'inode
-	new = ouichefs_iget(sb, it_sb->dl->inode);
-	if (IS_ERR(new))
-		return;
-
-	old = it_sb->inode; //pour faire iput
-	it_sb->inode = new; //nouvel inode
-	it_sb->file->f_inode = new;
-	it_sb->file->f_path.dentry->d_inode = new;
-
-	iput(old);
-}*/
-
-static int ouichefs_open(struct inode *inode, struct file *file) {
-        struct ouichefs_inode_info *ci;
-        struct super_block *sb;
-        struct buffer_head *bh;
-	//struct ouichefs_iterate_sb it_sb;
-	struct ouichefs_distant_link recup_lien;
-	//struct inode *new_inode;
+static int ouichefs_open(struct inode *inode, struct file *file)
+{
+	struct ouichefs_sb_info *sbi;
+	struct ouichefs_inode_info *ci;
+	struct buffer_head *bh;
+	struct inode *new_inode;
 	char *fblock = NULL;
-	struct inode* new_inode;
+	struct ouichefs_distant_link recup_lien;
+	int i;
 
-        if (S_ISLNK(inode->i_mode)) {
+	if (S_ISLNK(inode->i_mode)) {
+		ci = OUICHEFS_INODE(inode);
+		bh = sb_bread(inode->i_sb, ci->index_block);
 
-                ci = OUICHEFS_INODE(inode);
-                bh = sb_bread(inode->i_sb, ci->index_block);
-                        struct ouichefs_sb_info* sbi;
+		if (!bh)
+			return -EIO;
 
-                if(!bh)
-                return -EIO;
-                        
-                fblock = (char*)bh->b_data;
-                memcpy(&recup_lien, fblock, sizeof(recup_lien));
-                
-                int i;
-                for (i=0;i<part_total;i++) {
-                        sbi = OUICHEFS_SB(tab_d_kobj[i].kobj_dentry->d_sb);
-                        if (uuid_equal(&(sbi->uuid),&recup_lien.uuid)) {
-                                new_inode = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb, recup_lien.inode);
-                                if (new_inode == NULL) {
-                                        pr_warn("NO inode !!\n");
-                                        return -EIO;
-                                }
-                                pr_info("%d l'inode \n",recup_lien.inode);
-                                file->f_inode = new_inode;
-                                file->f_path.dentry->d_inode = new_inode;
+		fblock = (char *)bh->b_data;
+		memcpy(&recup_lien, fblock, sizeof(recup_lien));
 
-                                return simple_open(new_inode,file);
-                        }
+		for (i = 0; i < part_total; ++i) {
+			sbi = OUICHEFS_SB(tab_d_kobj[i].kobj_dentry->d_sb);
+			if (uuid_equal(&(sbi->uuid), &recup_lien.uuid)) {
+				new_inode = ouichefs_iget(tab_d_kobj[i].kobj_dentry->d_sb,
+							recup_lien.inode);
+				if (new_inode == NULL) {
+					pr_warn("NO inode !!\n");
+					return -EIO;
+				}
+				file->f_inode = new_inode;
+				file->f_path.dentry->d_inode = new_inode;
 
-                }		
-        }
-
-        return simple_open (inode, file);
+				return simple_open(new_inode, file);
+			}
+		}
+	}
+	return simple_open(inode, file);
 }
-
 
 
 const struct address_space_operations ouichefs_aops = {

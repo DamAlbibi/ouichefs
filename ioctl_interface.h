@@ -6,11 +6,6 @@
 #define MAX_LEN 50
 #define MAGIC_IOCTL 'F'
 
-/**
- * buffer len: MAX_LINK * MAX_PATHLEN
- * to extract each path, you have to split the buffer into multiple chunks of size MAX_PATHLEN
-*/
-
 /*struct ouichefs_hard_list {
     int fd; //fd of the file
     int pid; //pid of the process
