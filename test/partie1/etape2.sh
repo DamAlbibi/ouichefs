@@ -16,15 +16,21 @@ SYSFS_DIR=/sys/kernel/ouichfs_part
 
 # Affichage sysfs
 
+echo -e "--------------------------------------------------------\n"
+
 echo -e "\nAffichage du sysfs pour la partition 1 :"
 cat "${SYSFS_DIR}/0"
 
 echo -e "\nAffichage du sysfs pour la partition 2 :"
 cat "${SYSFS_DIR}/1"
 
+echo -e "--------------------------------------------------------\n"
+
 # Creation de 2 hard link differents dans la partition 1
 
-echo -e "\nCreation de deux hard link different sur 2 fichiers differents"
+echo -e "--------------------------------------------------------\n"
+
+echo -e "Creation de deux hard link different sur 2 fichiers differents\n"
 
 cd $DIR_PART1
 if ! test -f "$FIC1"; then
@@ -64,3 +70,5 @@ else
                 cat "${SYSFS_DIR}/1"
         fi
 fi
+
+echo -e "--------------------------------------------------------\n"

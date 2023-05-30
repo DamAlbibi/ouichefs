@@ -12,8 +12,10 @@ HARD_LINK=lien
 
 sleep 1
 
+echo -e "--------------------------------------------------------\n"
+
 # Creation hard link (ETAPE 1)
-echo -e "\nCreation hard link + lecture :"
+echo -e "Creation hard link + lecture :"
 
 cd $DIR_PART
 if ! test -f "$FILE_FIC"; then
@@ -30,5 +32,4 @@ cat $FILE_FIC
 echo -n "Contenu fichier lien : "
 cat $HARD_LINK 
 
-# Creation de multiple fichier sans hard link 
-# Afin de tester l'affichage du sysfs sur le nombre total 
+echo -e "--------------------------------------------------------\n"

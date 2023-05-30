@@ -1,4 +1,10 @@
 clean.sh : Permet de nettoyer les fichiers et repertoire apres execution du test
+ 
+----------------------------------
 
 etape4_5.sh : Test a la fois la creation de l'uuid et en donc en meme 
 son affichage dans le sysfs
+
+Passage du test : OK
+
+----------------------------------

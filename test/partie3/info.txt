@@ -1,4 +1,11 @@
 clean.sh : Permet de nettoyer les fichiers et repertoire apres execution du test
 
+----------------------------------
+
 etape6_7.sh : Test la creation d'un lien distant (part1/lien_distant) puis affiche le contenu de ce 
 lien pour verifier si ce lien distant affiche bien le contenu du fichier (part1/fic)
+
+Passage du test : NOT OK, creation du lien distant fonctionnel, cependant l'affichage sur celui-ci
+n'aboutit pas. (message d'erreur = "cat: sym: Too many levels of symbolic links")
+
+----------------------------------

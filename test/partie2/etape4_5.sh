@@ -14,6 +14,8 @@ SYSFS_DIR=/sys/kernel/ouichfs_part
 
 # Affichage du sysfs pour voir leur uuid 
 
+echo -e "--------------------------------------------------------\n"
+
 if ! test -d "$SYSFS_DIR"; then 
         echo "Repertoire {$SYSFS_DIR} non existant !\n"
 fi
@@ -21,13 +23,19 @@ fi
 if ! test -f "${SYSFS_DIR}/0"; then 
         echo "Fichier {$SYSFS_DIR}/0 non present !\n"
 else 
-        echo -e "\nAffichage du sysfs pour la partition 1 :\n"
+        echo -e "Affichage du sysfs pour la partition 1 :\n"
         cat "${SYSFS_DIR}/0"
 fi
+
+echo -e "--------------------------------------------------------\n"
+
+echo -e "--------------------------------------------------------\n"
 
 if ! test -f "${SYSFS_DIR}/1"; then 
         echo "Fichier {$SYSFS_DIR}/1 non present !\n"
 else 
-        echo -e "\nAffichage du sysfs pour la partition 2 :\n"
+        echo -e "Affichage du sysfs pour la partition 2 :\n"
         cat "${SYSFS_DIR}/1"
 fi
+
+echo -e "--------------------------------------------------------\n"

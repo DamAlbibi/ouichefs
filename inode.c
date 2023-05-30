@@ -366,7 +366,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		memcpy(fblock, (void *)&dist_link, sizeof(dist_link));
 		mark_buffer_dirty(bh);
 		brelse(bh);
-		pr_info("le nombre de lien et la taile à la création : %d, %d\n", new_inode->i_nlink, new_inode->i_size);
+		// pr_info("le nombre de lien et la taile à la création : %d, %d\n", new_inode->i_nlink, new_inode->i_size);
                 
                 /*
 		inode->i_size += sizeof(struct ouichefs_distant_link);
@@ -397,7 +397,7 @@ int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 	struct buffer_head *bh_old = NULL, *bh_new = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	int i;
-	pr_info("Le nombre de partition %d\n",part_total);
+	// pr_info("Le nombre de partition %d\n",part_total);
 
 	// Vérification de la taille du nom
 	if (strlen(new_dentry->d_name.name) > OUICHEFS_FILENAME_LEN)

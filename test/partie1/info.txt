@@ -1,10 +1,30 @@
 clean.sh : Permet de nettoyer les fichiers et repertoire apres execution d'un des tests
 
+----------------------------------
+
 etape1.sh : Test la creation de hard link sur une partition en verifiant si 
 l'affichage dans le fichier lie est le meme que celui du lien
 
+Passage du test : OK
+
+----------------------------------
+
+----------------------------------
+
 etape2.sh : Test l'affichage du sysfs en creant 2 partitions et en creant des 
 hard link sur la premiere pour verifier si le nombre d'inode pointe par au moins 2 liens
-est correct
+est correct. 
 
-etape3.sh : Test la suppression de lien 
+Passage du test : OK
+
+----------------------------------
+
+----------------------------------
+
+etape3.sh : Test la suppression de lien en affichant le nombre de lien 
+avant et apres dans le sysfs. (Seul ces 2 paritions doivent etre monte pour 
+une bonne lecture dans le sysfs)
+
+Passage du test : OK
+
+----------------------------------
