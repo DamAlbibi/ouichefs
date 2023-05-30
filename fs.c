@@ -295,6 +295,8 @@ asmlinkage long unlinkall(const struct pt_regs *regs)
 	uint32_t ino, bno;
 	uint32_t nbr_inode;
 
+	pr_warn("In syscall unlinkall\n");
+
 	path = (char *)regs->di;
 	len_buff = strlen(path)+1;
 	kernel_copy = kmalloc(len_buff*sizeof(char), GFP_ATOMIC);
@@ -337,7 +339,11 @@ asmlinkage long unlinkall(const struct pt_regs *regs)
 				}
 			}
 		}
+		//iput(inode_parcours);
+		
 	}
+	//dput(dentry);
+
 	return 0;
 }
 

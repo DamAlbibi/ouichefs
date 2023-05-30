@@ -25,14 +25,14 @@ if ! test -d "$DIR_PART1"; then
         mkdir $DIR_PART1
 fi 
 
-../../mkfs/./mkfs.ouichefs $FILE_IMG
+/usr/bin/mkfs.ouichefs $FILE_IMG
 mount $FILE_IMG $DIR_PART1
 
 if ! test -d "$DIR_PART2"; then
          mkdir $DIR_PART2
 fi 
 
-../../mkfs/./mkfs.ouichefs $FILE_IMG2
+/usr/bin/mkfs.ouichefs $FILE_IMG2
 mount $FILE_IMG2 $DIR_PART2
 
 echo -e "--------------------------------------------------------\n"
