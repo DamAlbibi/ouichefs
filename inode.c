@@ -334,7 +334,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		return -EINVAL;
 
 	inode->i_ctime = inode->i_atime = inode->i_mtime = current_time(inode); // Update des temps de l'inode 
-	// inode_inc_link_count(inode); // Incrémenter le cpt de lien 
+	inode_inc_link_count(inode); // Incrémenter le cpt de lien 
 	ihold(inode);
 	mark_inode_dirty(inode);
 
@@ -345,7 +345,6 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		mode_t creat_mode = S_IFLNK | 0777;
 		ouichefs_create(dir, new_dentry, creat_mode, 0);
 		
-
 		//distant link
 
 		new_inode = new_dentry->d_inode;
@@ -444,6 +443,7 @@ static int ouichefs_link(struct dentry *old_dentry, struct inode *dir,
 	return 0;
 }
 
+
 /*
  * Remove a link for a file. If link count is 0, destroy file in this way:
  *   - remove the file from its parent directory.
@@ -456,19 +456,18 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	struct super_block *sb = dir->i_sb;
 	struct ouichefs_sb_info *sbi2, *sbi = OUICHEFS_SB(sb);
 	struct inode *inode_file, *distant_inode, *inode = d_inode(dentry);
-	struct buffer_head *bh = NULL, *bh2 = NULL;
+	struct buffer_head *bh = NULL, *bh2 = NULL, *bh3 = NULL, *bh4 = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
-	struct ouichefs_file_index_block *file_block = NULL;
+	struct ouichefs_file_index_block *file_block = NULL, *file_block2 = NULL;
         struct ouichefs_distant_link *distant_link;
         // struct ouichefs_inode_info *inode_info;
-	uint32_t ino, bno;
+	uint32_t ino, bno, bno2;
         uint8_t has_distant_link;
 	int i, j, f_id = -1, nr_subs = 0;
 
 	ino = inode->i_ino;
 	bno = OUICHEFS_INODE(inode)->index_block;
 
-        /*
         if (S_ISLNK(inode->i_mode)) {
                 bh = sb_bread(inode->i_sb, bno);
                 distant_link = (struct ouichefs_distant_link*) bh->b_data;
@@ -488,7 +487,6 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                 inode_dec_link_count(inode_file);
                 mark_inode_dirty(inode_file);
         }
-        */
         
 	/* Read parent directory index */
 	bh = sb_bread(sb, OUICHEFS_INODE(dir)->index_block);
@@ -526,6 +524,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                         compteur de reference, i_nlink doit donc seulement etre un compteur
                         de lien locaux
                 */
+                /*/
                 has_distant_link = 0;
                 if (inode->i_nlink == 1) {
                         for (i=0;i<part_total;i++) {
@@ -558,9 +557,62 @@ end_test_distant_link:
 
                         distant_inode->i_mode = S_IFREG | 0777;
 
+                        // Ecriture sur les blocks                        
+                        
+                        bh = sb_bread(sb, bno);
+                        if (!bh) {
+                                pr_err("bh error");
+                                return -EIO;
+                        }
+
+                        file_block = (struct ouichefs_file_index_block *)bh->b_data;
+
+                        bh2 = sb_bread(distant_inode->i_sb, OUICHEFS_INODE(distant_inode)->index_block);
+                        if (!bh) {
+                                pr_err("bh2 error");
+                                return -EIO;
+                        }
+
+                        file_block2 = (struct ouichefs_file_index_block *)bh2->b_data;
+                        memset(file_block2, 0, OUICHEFS_BLOCK_SIZE);
+
+                        for (i = 0; i < inode->i_blocks; i++) {
+                                
+                                bh3 = sb_bread(sb, file_block->blocks[i]);
+                                if (!bh3) {
+                                        pr_err("bh3 error");
+                                        return -EIO;
+                                }
+                                
+                                if (file_block2->blocks[i] == 0) {
+                                        pr_info("fais voir");
+                                        bno2 = get_free_block(OUICHEFS_SB(distant_inode->i_sb));
+                                        if (!bno2) {
+                                                pr_err("bno2");
+                                                return -ENOSPC;
+                                        }
+                                        file_block2->blocks[i] = bno2;
+                                } 
+
+                                bh4 = sb_bread(distant_inode->i_sb, file_block2->blocks[i]);
+                                if (!bh4) {
+                                        pr_err("bh4 error");
+                                        return -EIO;
+                                }
+
+                                memcpy(bh4->b_data, bh3->b_data, OUICHEFS_BLOCK_SIZE);
+                                mark_buffer_dirty(bh2);
+                                mark_buffer_dirty(bh3);
+                                mark_buffer_dirty(bh4);
+                        }
+
+                        distant_inode->i_size = inode->i_size;
+                        distant_inode->i_blocks = inode->i_blocks;
+
                         mark_inode_dirty(distant_inode);
                         mark_inode_dirty(inode);
                 }
+                */
 
                 inode_dec_link_count(inode);
 	} 
