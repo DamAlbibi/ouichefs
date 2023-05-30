@@ -308,6 +308,7 @@ end:
 static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const char *pathname) {
 
 	// Recuperation de la dentry 
+        
 	int error = 0;
 	struct path path;
         
@@ -317,7 +318,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 	
 	struct inode *new_inode; // Inode du nouveau
 	
-	struct dentry* old_dentry = path.dentry;	
+	struct dentry *old_dentry = path.dentry;	
 	struct inode *inode = d_inode(old_dentry);
 
 	struct super_block *old, *new;
@@ -328,6 +329,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 	old = old_dentry->d_sb;
 	new = new_dentry->d_sb;
 
+        
 	if (strncmp("ouichefs", old->s_type->name, 8) != 0 || strncmp("ouichefs", new->s_type->name, 8) != 0)
 		return -EINVAL;
 
@@ -340,8 +342,8 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		pr_debug("Lien symbolique non-implementé");
 		return -EINVAL;
 	} else {
-		mode_t creat_mode =  S_IFLNK | 0777;
-		ouichefs_create(dir, new_dentry,creat_mode, 0);
+		mode_t creat_mode = S_IFLNK | 0777;
+		ouichefs_create(dir, new_dentry, creat_mode, 0);
 		
 
 		//distant link
@@ -353,6 +355,7 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		/*new_inode->i_mode &= ~ (S_IFREG); // On enlève le regular_file
 		new_inode->i_mode |= (DT_DISTANT<<12); //first bit = mark for distant link
 		*/
+        
 		bh = sb_bread(new, OUICHEFS_INODE(new_inode)->index_block);
 		if(!bh)
 			return -EIO;
@@ -364,14 +367,18 @@ static int ouichefs_symlink(struct inode *dir, struct dentry *new_dentry, const 
 		mark_buffer_dirty(bh);
 		brelse(bh);
 		pr_info("le nombre de lien et la taile à la création : %d, %d\n", new_inode->i_nlink, new_inode->i_size);
-
+                
+                /*
 		inode->i_size += sizeof(struct ouichefs_distant_link);
 		inode->i_blocks = inode->i_size / OUICHEFS_BLOCK_SIZE + 2;
 		inode->i_mtime = inode->i_ctime = current_time(inode);
-                
-		mark_inode_dirty(new_inode);
+                */
+                inode_inc_link_count(inode);
+                mark_inode_dirty(new_inode);
 		mark_inode_dirty(inode);
 	}
+        
+        path_put(&path);
 
 	return 0;
 }
@@ -411,6 +418,8 @@ int ouichefs_add_link(struct dentry *new_dentry, struct inode *inode)
 	mark_buffer_dirty(bh_new);
 	brelse(bh_new);
 
+        dput(new_dentry);
+
 	return 0;
 
 }
@@ -429,9 +438,8 @@ static int ouichefs_link(struct dentry *old_dentry, struct inode *dir,
 	ihold(inode);
 	if (ouichefs_add_link(dentry,inode)==0){
 		dget(dentry);
-		d_instantiate(dentry,inode);
+		d_instantiate(dentry, inode);
 	}
-	
 
 	return 0;
 }
@@ -447,12 +455,12 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct super_block *sb = dir->i_sb;
 	struct ouichefs_sb_info *sbi2, *sbi = OUICHEFS_SB(sb);
-	struct inode *distant_inode, *inode = d_inode(dentry);
+	struct inode *inode_file, *distant_inode, *inode = d_inode(dentry);
 	struct buffer_head *bh = NULL, *bh2 = NULL;
 	struct ouichefs_dir_block *dir_block = NULL;
 	struct ouichefs_file_index_block *file_block = NULL;
         struct ouichefs_distant_link *distant_link;
-        struct ouichefs_inode_info *inode_info;
+        // struct ouichefs_inode_info *inode_info;
 	uint32_t ino, bno;
         uint8_t has_distant_link;
 	int i, j, f_id = -1, nr_subs = 0;
@@ -460,7 +468,6 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	ino = inode->i_ino;
 	bno = OUICHEFS_INODE(inode)->index_block;
 
-        /*
         if (S_ISLNK(inode->i_mode)) {
                 bh = sb_bread(inode->i_sb, bno);
                 distant_link = (struct ouichefs_distant_link*) bh->b_data;
@@ -480,8 +487,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                 inode_dec_link_count(inode_file);
                 mark_inode_dirty(inode_file);
         }
-        */
-
+        
 	/* Read parent directory index */
 	bh = sb_bread(sb, OUICHEFS_INODE(dir)->index_block);
 	if (!bh)
@@ -512,7 +518,13 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
 	if (S_ISDIR(inode->i_mode)){
 		inode_dec_link_count(dir);
 	} else {
-                // Test si existence d'un lien distant sur une autre partition
+                /*
+                        Partie 4, etape 8 structure, test si existence d'un lien distant 
+                        Ici on part de l'hypothese qu'un symlink ne doit pas augmenter le 
+                        compteur de reference, i_nlink doit donc seulement etre un compteur
+                        de lien locaux
+                */
+                /*
                 has_distant_link = 0;
                 if (inode->i_nlink == 1) {
                         for (i=0;i<part_total;i++) {
@@ -527,10 +539,7 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                                                         bh = sb_bread(distant_inode->i_sb, OUICHEFS_INODE(distant_inode)->index_block);
                                                         distant_link = (struct ouichefs_distant_link*) bh->b_data;
 
-                                                        pr_info("distant inode ino = %ld, inode i_ino = %ld", distant_link->inode, inode->i_ino);
-
                                                         if ((distant_link->inode == inode->i_ino) && (uuid_equal(&(distant_link->uuid), &(sb->s_uuid)))) {
-                                                                pr_info("omg");
                                                                 has_distant_link = 1;
                                                                 goto end_test_distant_link;
                                                         }
@@ -541,29 +550,36 @@ static int ouichefs_unlink(struct inode *dir, struct dentry *dentry)
                 }
 
 end_test_distant_link:
-                pr_info("patate");
 
                 if (has_distant_link) {
                         pr_info("Il faut faire une migration");
                         pr_info("inode block = %d", inode->i_blocks);
 
-                        /*
+                        distant_inode->i_mode = S_IFREG | 0777;
+
                         for (i = 0; i < inode->i_blocks; i++) {
 
+                                bh = sb_bread(inode->i_sb, OUICHEFS_INODE(inode)->index_block + i);
+                                bh2 = sb_bread(distant_inode->i_sb, OUICHEFS_INODE(distant_inode)->index_block + i);
+                                
+		                memcpy((char*)&bh2->b_data, (char*)&bh->b_data, OUICHEFS_BLOCK_SIZE);
+                                mark_buffer_dirty(bh2);
                         }
-                        */
                         inode_dec_link_count(inode);
-                } else {
-                        pr_info("bruhhhh");
-                        inode_dec_link_count(inode);
+                        mark_inode_dirty(distant_inode);
+                        mark_inode_dirty(inode);
                 }
+                */
 
-                pr_info("chaude");
+
+                inode_dec_link_count(inode);
 	} 
 
 	mark_inode_dirty(dir);
 
-	if (inode->i_nlink!=0)
+        dput(dentry);
+
+	if (inode->i_nlink!=0) 
                 return 0;
 	
 	/*
@@ -613,6 +629,8 @@ clean_inode:
 		inode->i_mtime.tv_sec =
 		inode->i_atime.tv_sec = 0;
 	mark_inode_dirty(inode);
+        pr_info("i_link = %d", inode->i_link);
+        iput(inode);
 
 	/* Free inode and index block from bitmap */
 	put_block(sbi, bno);

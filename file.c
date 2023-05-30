@@ -215,8 +215,6 @@ static int ouichefs_open(struct inode *inode, struct file *file) {
 	char *fblock = NULL;
 	struct inode* new_inode;
 
-        
-
         if (S_ISLNK(inode->i_mode)) {
 
                 ci = OUICHEFS_INODE(inode);
@@ -243,7 +241,6 @@ static int ouichefs_open(struct inode *inode, struct file *file) {
                                 file->f_path.dentry->d_inode = new_inode;
 
                                 return simple_open(new_inode,file);
-
                         }
 
                 }		

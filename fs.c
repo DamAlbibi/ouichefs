@@ -105,8 +105,8 @@ void ouichefs_kill_sb(struct super_block *sb)
 	}
 	if (i!=MAXMOUNT)
 	{
-	sysfs_remove_file(ouichfs_part,&(tab_d_kobj[i].kobj_att.attr));
-	part_total--;
+                sysfs_remove_file(ouichfs_part,&(tab_d_kobj[i].kobj_att.attr));
+                part_total--;
 	}
 
 	kill_block_super(sb);
