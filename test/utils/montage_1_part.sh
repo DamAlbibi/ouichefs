@@ -16,7 +16,7 @@ if ! test -d "$DIR_PART"; then
         mkdir $DIR_PART
 fi 
 
-../../mkfs/./mkfs.ouichefs $FILE_IMG
+/usr/bin/mkfs.ouichefs $FILE_IMG
 mount $FILE_IMG $DIR_PART
 
 echo -e "--------------------------------------------------------\n"

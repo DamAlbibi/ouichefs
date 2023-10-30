@@ -18,7 +18,8 @@
 #define OUICHEFS_FILENAME_LEN            28
 #define OUICHEFS_MAX_SUBFILES           128
 #define MAXMOUNT 						100
-
+#define CR0_MASK 0x10000 /* bit 16 CR0 */
+#define SYSCALL_OFFSET_INSERT 335
 
 
 

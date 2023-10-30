@@ -1,0 +1,259 @@
+
+Noms et prénoms des membres du binôme/trinôme
+- Maxime Derri.
+- Damien Albisson.
+- Yacine Idouar.
+
+
+README
+======
+
+
+Partie 1 : Ajout des liens physiques standard
+--------------------------------------------
+
+* Liens physiques standards
+
+---RÉPONSES---
+Cette étape à été implémentée et est fonctionnelle.
+
+Afin de réaliser cette étape, nous avons pris exemple sur la création d'un fichier par ouichefs (ouichefs_create)
+pour l'insertion de l'inode et du nom du fichier dans un blocs du répertoire.
+Comme un lien physique est un inode référencé par plusieurs entrées dans les répertoires, il faut que la commande
+ln ou link provoque dans ouichefs l'insertion dans le répertoire de destination d'une entrée contenant le nom choisis, ainsi que l'inode
+référencé.
+De plus, il faut veiller à augmenter le nombre de lien qui référence l'inode dans sa structure et marquer cette structure dirty pour qu'elle soit
+mise à jour sur le disque plus tard.
+De même, quand on supprime le fichier, il faut retirer 1 au compteur de lien et marquer l'inode dirty (et on laisse le comportement de base
+qui fait que lorsqu'un inode n'est plus référencé, il doit être rendu).
+
+Au niveau du code:
+- Nous avons ajouté à la structure inode_operations la fonction link (ouichefs_link) qui va s'occupper de créer le lien physique avec l'aide de la fonction
+ouichefs_add_link. On va mettre à jour certains champs de l'inode comme les temps, le nombre de liens physiques de l'inode, puis on va chercher dans le dentry destination
+une place libre pour insérer le nom du fichier ainsi que le numéro de l'inode.
+Le buffer utilisé (buffer_head) est aussi marqué dirty pour provoquer plus tard une écriture du blocs du répertoire.
+- Modification de unlink pour pouvoir prendre en compte les liens physiques en retirant l'entrée ainsi que diminuer son compteur de lien physiques si jamais
+le compteur est plus grand que 1 (s'il tombe à 0, alors on rend l'inode, mais cette partie était déjà implémentée).
+
+
+* Surveillance des liens physiques
+
+---RÉPONSES---
+Cette fonctionnalitée à été implémentée et est fonctionnelle.
+
+Nous avons fait en sort qu'à l'insertion du module, un répertoire ouichefs_part soit crée dans le sysfs afin de contenir un fichier par partition.
+Au moment du montage d'une partition, on créer un nouveau fichier afin de pouvoir différencier les partitions pour l'affichage des informations.
+Au moment du démontage d'une partition, on fait l'inverse (on retire ce fichier).
+Enfin, quand on retire le module, on supprime ouichefs_part du sysfs.
+
+Pour pouvoir différencier les différents fichiers et attributs de notre répertoire du sysfs, nous avons ajouté une structure contenant
+le dentry du root d'une partition ainsi que l'objet attribut du sysfs associé au fichier.
+Puis, nous déclarons un tableau de cette structure.
+Comme la fonction d'affichage est globale (on ne peut pas créer une fonction show par partition car cela prend de la place et surtout qu'on ne peut deviner le nombre de
+partition), nous avons décidé d'utiliser ce tableau.
+
+Dans la fonction show, on recherche à l'aide des arguments et du tableau le bon superbloc puis on compte ses liens physiques en verifiant pour chaque inode son compteur
+de liens.
+La dernière étape consiste à écrire dans le fichier du sysfs avec snprintf.
+
+
+
+* Lister et supprimer des liens physiques
+
+---RÉPONSES---
+L'ioctl est implémenté et fonctionnel, le syscall est implémenté mais non fonctionnel.
+
+* IOCTL:
+Pour définir l'ioctl, nous avons du ajouté une structure file_operations avec le champ unlocked_ioctl.
+Au moment de l'init du module, il faut aussi enregistrer ce dernier en temps que char device.
+Pour réaliser cette opération, nous devons dans un premier temps extraire de la task_struct (current) la struct files_struct qui contient la table des entrées
+des fichiers du processus ayant réalisé la commande.
+Puis, avec l'argument (fd), on recherche dans le tableau l'entrée correspondant et si le fichier existe on récupère la structure.
+Maintenant, on peut extraire son inode.
+
+Ensuite, on itère sur les inodes du superbloc en cherchant tous les répertoires. Pour chaque répertoire on verifie dans son bloc s'il contient une entrée qui référence
+l'inode afin de les prendre en compte. La recherche des inodes se fait avec ouichefs_iget et la lecture des blocs passe par le buffer cache
+(struct buffer_head pour les opérations).
+
+
+
+* SYSCALL:
+L'insertion du syscall est plus compliquée avec le noyau que l'on utilise cette année (changement de version => modification dans les sources).
+En effet, la technique était d'utiliser sys_close afin de trouver l'adresse de la table.
+Cela était faisable car sys_close était exporté... Mais plus maintenant.
+De plus, l'objectif est que l'on ne doit pas modifier les sources du noyau mais uniquement d'utiliser le module donc on ne peut pas non plus compter sur la recherche
+du symbole depuis le module (la fonction également pas exporté).
+
+Nous avons décidé d'utiliser le fichier du procfs /proc/kallsyms en cherchant une adresse d'appel système.
+En regardant le fichier définissant le tableau des appels système (syscall_64.tbl), on remarque:
+"The __x64_sys_*() stubs are created on-the-fly for sys_*() system calls".
+On va donc chercher dans /proc/kallsyms l'adresse de __x64_sys_close avc cat et grep.
+
+Cette adresse est à indiquer en paramètre au chargement du module.
+
+Ensuite, on cherche l'adresse de la table en parcourant les adresses de l'espace noyau et si on trouve dans un emplacement l'adresse associée à __x64_sys_close 
+(ou un autre appel système) par un cast vers un pointeur, alors on a trouvé l'adresse de la table.
+
+Ensuite, pour l'insertion on a décidé de la faire dans la case 335 qui semble vide.
+Cependant, pour écrire dans la table il faut modifier le bit WP du registre CR0.
+Le problème est que la fonction qui permet de le faire fait quand même une vérification sur le bit WP, ce qui nous empêche d'utiliser cette fonction.
+La solution que nous avons retenu est de bypass la vérification en exécutant directement du code assembleur (avec asm volatile).
+Donc, on récupère la valeur de CR0, on modifie le bit WP dans une copie, on écrit dans le registre la copie, on insère dans la table l'appel système,
+puis on remet le bit WP de CR0.
+
+Pour ce qui est du code de l'appel système,
+L'appel système récupère l'inode à partir du pathname en entrée, puis il parcourt tous les répertoires de la partition afin de trouver les liens et faire une suppression
+de ces derniers, nous avons implémenté une fonction qui a le même comportement que ouichefs_unlink mais elle ne fonctionnait pas bien, et ce car on faisait une suppression
+sans faire appel à do_unlinkat et vfs_unlink qui font un ensemble de pré-traitement avant de pouvoir supprimer le fichier.
+
+
+
+
+Partie 2 : Ajout d'un UUID
+--------------------------
+
+* Identification unique des partitions ouichefs via UUID
+
+---RÉPONSES---
+Cette étape est implémentée et fonctionnelle.
+
+On a deux choses à faire:
+- modifier l'utilitaire de formatage, en ajoutant un champs uuid dans la structure du superbloc et en réduisant de cette taille le padding. Puis on génère l'uuid avec libuuid.
+L'écriture de l'uuid sera faite par l'écriture du superbloc dans l'image. Aussi, il faut penser à ajouter au Makefile -luuid pour lier la bibliothèque.
+- Modifier ouichefs_fill_super, la fonction de super.c, qui est chargée de récupérer dans l'image le superbloc. Pour cela, il faut modifier en conséquence la structure
+ouichefs_sb_info afin de coller à la structure utilisée par l'utilitaire de formatage (il faut placer le champs uuid, et avant les deux pointeurs).
+Quand la fonction ira récupérer le bloc, on pourra ainsi utiliser uuid_copy afin de remplir le champs privé et le champs uuid du super_bloc.
+
+
+
+* Enrichissement des utilitaires de débogage
+
+---RÉPONSES---
+Cette étape est implémentéee et fonctionnelle.
+
+L'idée est de modifier notre fonction show du sysfs et l'ioctl afin de gérer l'uuid.
+Pour cela, la modification effectuée dans la fonction show du sysfs est simplement d'extraire l'uuid du superbloc et de l'ajouter au résultat.
+Comme précédement, le superbloc est récupéré de notre tableau à partir du dentry de la racine de la partition (d_sb).
+
+Pour l'ioctl, il faut aussi retrouver le superbloc à travers la struct file récupérée précédement (struct file -> struct inode -> struct super_block).
+Puis, comme pour l'ioctl on peut extraire l'uuid et l'ajouter au résultat retourné.
+
+
+
+
+
+Partie 3 : Liens physiques inter-partitions
+-------------------------------------------
+
+* Modification des structures de données de ouichefs
+
+---RÉPONSES---
+Cette étape est réalisée et est fonctionnelle.
+
+Dans un premier temps, nous avons pensé à modifier la fonction ouichefs_link car la première partie traite des liens hard.
+Cependant après l'implémentation quand on a testé notre code, le noyau nous indiquait qu'on ne pouvait pas faire de liens hard inter-partition.
+Nous avons choisis comme solution d'utiliser symlink à la place (ouichefs_symlink), ce qui nous a permis de passer outre ce problème.
+
+- on a ajouté une structure ouichefs_distant_link pour gérer l'écriture et la lecture sur le bloc d'index des liens distants. 
+Les champs sont un uuid et un numéro d'inode.
+
+- On a ajouté à inode_operations un pointeur pour symlink.
+Cette fonction va faire une vérification sur le type des partitions (ouichefs).
+Si la condition est satisfaite, alors on va incrémenter le nombre de liens de l'inode source.
+On va préparer le nouvel inode en modifiant i_mode afin de le déclarer comme lien distant en utilisant la macro pour les liens symboliques
+et on va utiliser notre structure pour la remplire de l'uuid de la partition cible ainsi que de l'inode cible.
+Enfin, on écrit dans le bloc d'index du nouvel inode en utilisant une struct buffer_head (et le marquage dirty).
+
+- On a modifié unlink pour prendre en compte les liens distants.
+Maintenant, on fait une vérification sur l'inode pour détecter un lien distant. Si on détecte un tel lien, alors on va lire le bloc d'index pour récupérer la structure
+ouichefs_distant_link et on va aller chercher le superbloc associé à l'uuid et faire un iget pour récupérer l'inode.
+On va donc pouvoir décrémenter le compteur de liens de l'inode cible. Si c'est un lien distant, il ne peut pas retomber à 0 car ce sont bien deux inode différents dû aux
+liens symboliques redéfinis.
+
+
+
+* Permettre l'utilisation de liens distants
+
+---RÉPONSES---
+Implémenté et fonctionne plus ou moins.
+
+On a eu comme première idée de modifier ouichefs_iget afin de changer l'inode retourné si jamais on cherche un lien distant. Le problème est qu'on risque dans ce cas de ne
+plus jamais pouvoir accéder à l'inode qui référence l'autre inode.
+Cela pose un problème pour modifier ou supprimer ce lien.
+
+La deuxième idée que l'on a eu (et qu'on a utilisé) est de définir la fonction open pour notre file_operations (ouichefs_open), et de faire la vérification ici.
+Si jamais on ne manipule pas un lien distant, alors on utilise simple_open.
+Sinon, on va devoir lire le bloc d'index qui dans notre cas ne contient pas les références aux blocs du fichier mais contient l'uuid et l'inode cible.
+Puis, on va chercher dans notre tableau le superbloc correspondant et faire un iget sur le numéro d'inode récupéré du bloc d'index.
+A partir des paramètres de la fonction et du nouvel inode, on va pouvoir changer le pointeur d'inode des struct file et dentry comme demandé dans l'étape 7.
+
+Cependant, lorsqu'on tente par exemple une lecture, on ne peut obtenir le contenu du fichier référencé au travers du lien distant,
+Alors qu'avec les liens physiques de la partie 1 on y arrive.
+
+On a passé plusieurs jours mais on arrive pas à régler le problème. La veille de la deadline, on a réussi à faire avancer un peu la situation mais on obtiens maintenant une
+erreur: "cat: sym: Too many levels of symbolic links". On a regardé sur différents forums et cela pourrait être du au fait que nos deux fichiers se références l'un l'autre.
+On a fait plusieurs vérifications et on a rien trouvé.
+
+
+
+
+
+Partie 4 : Gestion de l'espace libre et migration d'inodes
+----------------------------------------------------------------
+
+
+|=========================================================================================|
+| Pour ne pas rester bloqué sur l'étape 6 avec le peu de temps restant, nous avons malgré |
+| tout voulu regarder un peu la partie 4. Certaines fonctionnalités sont implémentés mais |
+| peuvent être un peu compliqué à essayer / peuvent ne pas fonctionner du à la partie 3.  |
+|=========================================================================================|
+
+
+* Migration à la suppression lorsqu'il n'y a qu'un lien distant
+
+---RÉPONSES---
+Implémenté mais pas fonctionnel.
+Cependant, voici notre vision sur la réponse:
+
+Comme expliqué dans l'étape 8, on peut maintenant avoir des liens hard et distants sur un inode et pour chacun d'eux, on augmente le compteur de lien.
+On peut donc se retrouver dans une situation où l'on a que des liens distants... On souhaite donc pouvoir détecter le nombre de liens hard encore présent afin de décider
+si un transfert est envisageable ou non.
+
+On pourrait envisager un compteur de plus, mais cela posera problème pour son stockage sur le disque (comme pour la partie 3 et le champ pour différencier les liens distants).
+La solution que l'on a retenu dans le cas où l'inode possède plusieurs liens vers lui est de parcourir les inodes et de vérifier:
+- au premier lien distant trouvé (dans cette étape un seul au maximum), garder une trace au cas où pour la migration des blocs.
+- si on trouver un lien hard, alors on sait qu'il ne reste pas que des lien distants et donc on peut s'arrêter ici.
+
+- à la sortie de la recherche, si on a pas trouvé de lien hard, alors on va devoir faire une migration vers le lien distant retenu.
+
+La migration des blocs doit transformer le lien distant en fichier régulier (il va donc falloir changer i_mode et marquer l'inode dirty pour le sauvegarder).
+On va devoir écraser le contenu de l'index bloc de la cible pour pouvoir y écrire les références vers ses nouveaux blocs (qu'il faut demander).
+Ensuite on utilisera le buffer cache pour lire dans la partition source et écrire vers les blocs de l'inode destination en fonction de la taille du fichier et du nombre
+de blocs. Il faudra penser à marquer les buffers dirty pour les écrire.
+
+Enfin, on pourra continuer et diminuer le compteur de lien et remarquer l'inode dirty.
+
+
+* Migration à la suppression
+
+---RÉPONSES---
+Non implémenté.
+Voici notre idée de réponse:
+
+Dans cette étape, on étend la précédente en prennant en compte le fait qu'on puisse avoir plusieurs liens distants.
+
+Comme première modification, lors de la recherche d'un potentiel lien distant, on va devoir prendre en compte le nombre de blocs libres de la partition contenant
+un de ces liens distants vers l'inode courrant que l'on souhaite rendre.
+
+Il faut également garder une trace de l'uuid et du numéro de l'inode que l'on souhaite rendre.
+
+Une fois la migration effectuée, on va chercher les liens distants qui pointent vers l'uuid et le numéro de l'inode qu'on est sur le point de libérer car il faut modifier
+le contenu des blocs d'index, pour qu'ils pointent vers l'inode qui récupère les blocs.
+De même, tous les liens distants qui sont dans la même partition que le lien distant qu'on a transformé en fichier régulier doivent devenir des liens hard.
+
+
+
+* Migration pour optimiser l'espace de stockage (bonus)
+
+---RÉPONSES---
+

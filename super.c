@@ -237,7 +237,6 @@ int ouichefs_fill_super(struct super_block *sb, void *data, int silent)
 	struct ouichefs_sb_info *sbi = NULL;
 	struct inode *root_inode = NULL;
 	int ret = 0, i;
-	__u8 tab[UUID_SIZE]; //TO REMOVE
 
 	/* Init sb */
 	sb->s_magic = OUICHEFS_MAGIC;
